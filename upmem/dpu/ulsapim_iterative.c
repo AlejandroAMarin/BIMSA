@@ -2,6 +2,7 @@
  * WFA Distance implementation with multiple tasklets
  *
  */
+
 #include <stdint.h>
 #include <stdio.h>
 #include <defs.h>
@@ -12,8 +13,6 @@
 #include <barrier.h>
 #include "common.h"
 #include "ulsapim.h"
-#include <perfcounter.h>
-#include "counterperf.h"
 
 __host dpu_arguments_t DPU_INPUT_ARGUMENTS;
 
@@ -35,17 +34,8 @@ int main(void){
 // main_kernel1
 int main_kernel1() {
 	uint32_t tasklet_id = me();
-#if PRINT
-	//printf("tasklet_id = %u\n", tasklet_id);
-#endif
 	if(tasklet_id == 0){
 		mem_reset(); // Reset the heap
-		#if PERF_CYCLES
-		perfcounter_config(COUNT_CYCLES, true);
-		#endif
-		#if PERF_INSTRUCTIONS
-		perfcounter_config(COUNT_INSTRUCTIONS, true);
-		#endif
 	}
 	// Barrier
 	barrier_wait(&my_barrier);
@@ -55,7 +45,9 @@ int main_kernel1() {
 	#if PERF
 		perfcounter_cycles counter;
 		dpu_results_t *result = &DPU_RESULTS[tasklet_id];
-		result->counter = 0;
+		result->main = 0;	
+	#endif
+	#if PERF_MAIN
 		timer_start(&counter);
 	#endif
 
@@ -66,15 +58,15 @@ int main_kernel1() {
 
 	// Parameters
 	const uint64_t num_pairs_per_tasklet = num_pairs_per_dpu / NR_TASKLETS;	
-	size_t max_distance = 2 * longest_seq * MAX_ERROR;
-	size_t cigar_length = 2 * longest_seq;
+	int64_t max_distance = 2 * longest_seq * MAX_ERROR;
+	int64_t cigar_length = 2 * longest_seq;
 	ewf_offset_t cigar_length_adjustment = cigar_length % BLOCK_SIZE_INPUTS;
 	if(cigar_length_adjustment != 0)
 		cigar_length += (BLOCK_SIZE_INPUTS - cigar_length_adjustment);
 
 	// Offsets per tl size calculation
-	size_t offsets_size_per_tl      = 2 * max_distance * sizeof(ewf_offset_t);
-	size_t offsets_size_adjustement = offsets_size_per_tl % BLOCK_SIZE;
+	int64_t offsets_size_per_tl      = 2 * max_distance * sizeof(ewf_offset_t);
+	int64_t offsets_size_adjustement = offsets_size_per_tl % BLOCK_SIZE;
 	if(offsets_size_adjustement != 0)
 		offsets_size_per_tl += (BLOCK_SIZE - offsets_size_adjustement);
 
@@ -84,21 +76,17 @@ int main_kernel1() {
 	ewf_offset_t target_offset, distance;
 	uint32_t my_first_pair = tasklet_id * num_pairs_per_tasklet;
 
-	// int length_size = num_pairs_per_dpu * sizeof(uint32_t);
-	// int reminder = length_size % 8;
-	// length_size = length_size + reminder;
-
 	// Memory addresses
 	const uint32_t ma_start = (uint32_t) DPU_MRAM_HEAP_POINTER + BLOCK_SIZE_INPUTS;
 	uint32_t       ma_pattern_start, ma_text_start;
 	uint32_t 	   ma_pattern_lengths = ma_start + num_pairs_per_dpu * 2 * longest_seq * sizeof(char) + // patterns and texts
 								  		(tasklet_id * num_pairs_per_tasklet * sizeof(uint32_t)); // my offset inside pattern lengths
 	uint32_t 	   ma_text_lengths    = ma_pattern_lengths + (NR_TASKLETS * num_pairs_per_tasklet * sizeof(uint32_t));
-	//uint32_t       ma_results         = ma_text_lengths + (NR_TASKLETS * num_pairs_per_tasklet * sizeof(uint32_t));
-	uint32_t       ma_results         = ma_start +
-											 (num_pairs_per_dpu * (2 * longest_seq) * sizeof(char)) +  			 // Sequences (patterns and texts)
-											 (2 * num_pairs_per_dpu * sizeof(uint32_t)) + 				         // Sequences' lengths
-											 (tasklet_id * num_pairs_per_tasklet * sizeof(int32_t));		 // My offset inside results
+	uint32_t       ma_results         = ma_text_lengths + (NR_TASKLETS * num_pairs_per_tasklet * sizeof(uint32_t));
+	// uint32_t       ma_results         = ma_start +
+	// 										 (num_pairs_per_dpu * (2 * longest_seq) * sizeof(char)) +  			 // Sequences (patterns and texts)
+	// 										 (2 * num_pairs_per_dpu * sizeof(uint32_t)) + 				         // Sequences' lengths
+	// 										 (tasklet_id * num_pairs_per_tasklet * sizeof(int32_t));		 // My offset inside results
 	uint32_t       ma_wf_fw      = (ma_results - (tasklet_id * num_pairs_per_tasklet * sizeof(int32_t))) + 	 // Sequences' lengths starting position
 	                                         (num_pairs_per_dpu * sizeof(int32_t)) + 				       	 // Results
 					                         (tasklet_id * offsets_size_per_tl);                                 // My offset inside wavefronts
@@ -111,13 +99,13 @@ int main_kernel1() {
 	uint32_t       ma_wf_rv_next = (ma_wf_rv - (tasklet_id * offsets_size_per_tl)) + 		 	 			 // wavefronts reverse starting position
 	                                       	 (NR_TASKLETS * offsets_size_per_tl) + 			       				 // reverse_next wavefronts
 					       					 (tasklet_id * offsets_size_per_tl);                             	 // My offset inside reverse_next wavefronts
-	uint32_t       ma_cigar = (ma_wf_rv_next - (tasklet_id * offsets_size_per_tl)) + 		 	 			 // wavefronts reverse starting position
+	uint64_t       ma_cigar = (ma_wf_rv_next - (tasklet_id * offsets_size_per_tl)) + 		 	 			 // wavefronts reverse starting position
 											 (NR_TASKLETS * offsets_size_per_tl) + 			       				 // cigars 
 											 (tasklet_id * cigar_length * num_pairs_per_tasklet); // My offset inside ma_cigar wavefronts
-	uint32_t       ma_cigar_aux = (ma_cigar - (tasklet_id * cigar_length * num_pairs_per_tasklet)) +
+	uint64_t       ma_cigar_aux = (ma_cigar - (tasklet_id * cigar_length * num_pairs_per_tasklet)) +
 											 (NR_TASKLETS * cigar_length * num_pairs_per_tasklet) + 	// starting position
 								  			 (tasklet_id * (cigar_length + 8)); // My offset
-	uint32_t       ma_tasks = (ma_cigar_aux - (tasklet_id * (cigar_length + 8))) +
+	uint64_t       ma_tasks = (ma_cigar_aux - (tasklet_id * (cigar_length + 8))) +
 											 (NR_TASKLETS * (cigar_length + 8)) + 	// starting position
 								  			 (tasklet_id * QUEUE_SZ); // My offset
 	
@@ -127,13 +115,12 @@ int main_kernel1() {
 	//	printf("DPU results mem pos: %d\n", ma_results - ma_start);
 	//	printf("DPU threshold: %d\n", threshold);
 
-	uint32_t       cma_cigar = ma_cigar;
-	uint32_t       cma_cigar_aux = ma_cigar_aux + cigar_length*sizeof(char)+8;
-	uint32_t       cma_tasks = ma_tasks;
+	uint64_t       cma_cigar = ma_cigar;
+	uint64_t       cma_cigar_aux = ma_cigar_aux + cigar_length*sizeof(char)+8;
+	uint64_t       cma_tasks = ma_tasks;
 
 	//printf("DPU ma pattern len %d ma text len %d\n", ma_pattern_lengths -(uint32_t)DPU_MRAM_HEAP_POINTER, ma_text_lengths -(uint32_t)DPU_MRAM_HEAP_POINTER);
 	//printf("DPU ma  %d\n", ma_results -(uint32_t)DPU_MRAM_HEAP_POINTER);
-
 
 	const uint32_t loop_limit            = BLOCK_SIZE 	     / sizeof(ewf_offset_t);
 	const int32_t task_limit            = BLOCK_SIZE 	     / sizeof(pair_meta_t);
@@ -183,15 +170,17 @@ int main_kernel1() {
 
 	// Initialize pattern lenghts cache
 	mram_read_aligned(&ma_pattern_lengths, cache_pattern_lengths, &read_idx_patt_length, BLOCK_SIZE_INPUTS, TYPE_BYTES_SIZE);
-	ma_pattern_lengths += BLOCK_SIZE_INPUTS;
+	//ma_pattern_lengths += BLOCK_SIZE_INPUTS;
 
 	// Initialize text lenghts cache
 	mram_read_aligned(&ma_text_lengths, cache_text_lengths, &read_idx_text_length, BLOCK_SIZE_INPUTS, TYPE_BYTES_SIZE);
-	ma_text_lengths += BLOCK_SIZE_INPUTS;
+	//ma_text_lengths += BLOCK_SIZE_INPUTS;
 
 	// Iterate over pairs
 	for(uint32_t pair = 0; pair < num_pairs_per_tasklet; pair++)
 	{
+		cma_cigar_aux = ma_cigar_aux + cigar_length*sizeof(char)+8;
+		cma_tasks = ma_tasks;
 		// Initialize memory addresses
 		ma_pattern_start 	= ma_start         	  + ((my_first_pair + pair) * longest_seq * sizeof(char));
 		ma_text_start   	= ma_pattern_start + (num_pairs_per_dpu  * longest_seq * sizeof(char));
@@ -206,11 +195,12 @@ int main_kernel1() {
 		// 	printf("DPU ma texts %d\n", ma_text_start -(uint32_t)DPU_MRAM_HEAP_POINTER);
 		// }
 
+
 		// Obtain current pattern and text lengths
 		pattern_length = cache_pattern_lengths [read_idx_patt_length];
 		text_length    = cache_text_lengths    [read_idx_text_length];
 
-		if (pattern_length + text_length == 0){
+		if (pattern_length + text_length <= 0){
 			//printf("Plen and tlen %d and %d \n", pattern_length, text_length);
 			if(read_idx_distances > 0) // Min numpairs per tasklet to compute
 			{
@@ -223,8 +213,8 @@ int main_kernel1() {
 		read_idx_patt_length++;
 		if(read_idx_patt_length == num_ints_inputs_block)
 		{
-			mram_read((__mram_ptr void *) ma_pattern_lengths, cache_pattern_lengths, BLOCK_SIZE_INPUTS);
 			ma_pattern_lengths += BLOCK_SIZE_INPUTS;
+			mram_read((__mram_ptr void *) ma_pattern_lengths, cache_pattern_lengths, BLOCK_SIZE_INPUTS);
 			read_idx_patt_length = 0;
 		}
 
@@ -232,8 +222,8 @@ int main_kernel1() {
 		read_idx_text_length++;
 		if(read_idx_text_length == num_ints_inputs_block)
 		{
-			mram_read((__mram_ptr void *) ma_text_lengths, cache_text_lengths, BLOCK_SIZE_INPUTS);
 			ma_text_lengths += BLOCK_SIZE_INPUTS;
+			mram_read((__mram_ptr void *) ma_text_lengths, cache_text_lengths, BLOCK_SIZE_INPUTS);
 			read_idx_text_length = 0;
 		}
 
@@ -242,6 +232,11 @@ int main_kernel1() {
 		target_k_abs  = ABS(target_k);
 		target_offset = EWAVEFRONT_OFFSET(text_length, pattern_length);
 
+		// profiling_start(&first_breakpoint);
+		#if PERF_MAIN
+		result->main += timer_stop(&counter);
+		timer_start(&counter);
+		#endif
 		distance = find_breakpoint_iterative(pattern_length, text_length,
 					cache_wf,
 					cache_wf_fw, cache_wf_rv,
@@ -253,18 +248,17 @@ int main_kernel1() {
 					loop_limit, offsets_size_per_tl, threshold,
 					&cma_cigar, cache_cigar, cache_cigar_aux,
 					&cma_cigar_aux, &cigar_aux_pos, cache_tasks, &task_idx, &cma_tasks,
-					task_limit, max_distance
+					task_limit, max_distance, result, &counter
 					);
+		// profiling_stop(&first_breakpoint);
 		if(distance == -1){
 			loop = 0;
-			printf("[DPU] first breakpoint exceeds mas distance");
+			printf("[DPU] first breakpoint exceeds max distance");
 		} 
-		if(task_idx<0 && cma_tasks == ma_tasks) loop = 0;
-		// if(distance < 7){
-		 	//printf("DPU distance %d\n", distance);
-		// 	printf("Plen and tlen %d and %d \n", pattern_length, text_length);
-		// }
+		//if(task_idx<0 && cma_tasks == ma_tasks || distance == 0) loop = 0;
+		if(distance == 0) loop = 0;
 
+		// profiling_start(&other_breakpoints);
 		while(loop){
 			// read a task
 			if(task_idx<0 && cma_tasks == ma_tasks) {
@@ -282,7 +276,10 @@ int main_kernel1() {
 			//printf("\nDPU looping task %d in block %d tasklet id %d\n", task_idx, (ma_tasks - cma_tasks)/BLOCK_SIZE, tasklet_id);
 			// printf("DPU CONSUMING TASK ma_p_s %d ma_t_s %d ma_p_rev_s %d ma_t_rev_s %d plen %d tlen %d\n", pair_metadata.ma_p_start, 
 			// 		pair_metadata.ma_t_start, pair_metadata.ma_rev_p_start, pair_metadata.ma_rev_t_start, pair_metadata.p_len, pair_metadata.t_len);
-
+			#if PERF_MAIN
+			result->main += timer_stop(&counter);
+			timer_start(&counter);
+			#endif
 			find_breakpoint_iterative(pattern_length, text_length,
 								cache_wf,
 								cache_wf_fw, cache_wf_rv,
@@ -294,7 +291,7 @@ int main_kernel1() {
 								loop_limit, offsets_size_per_tl, threshold,
 								&cma_cigar, cache_cigar, cache_cigar_aux,
 								&cma_cigar_aux, &cigar_aux_pos, cache_tasks, &task_idx, &cma_tasks,
-								task_limit, max_distance
+								task_limit, max_distance, result, &counter
 								);
 			if(task_idx<0 && cma_tasks == ma_tasks) {
 				break;
@@ -308,15 +305,16 @@ int main_kernel1() {
 			}
 
 		}
-		
+		// profiling_stop(&other_breakpoints);
 		if ((cigar_aux_pos)==BLOCK_SIZE_INPUTS-1)
 		{
 			mram_write(cache_cigar_aux, (__mram_ptr void *) cma_cigar, BLOCK_SIZE_INPUTS);
-			(cigar_aux_pos)=-1;
+			cigar_aux_pos = 0;
 			cma_cigar += BLOCK_SIZE_INPUTS;
 		}
-		cache_cigar_aux[cigar_aux_pos+1] = '\0';
-
+		if(cigar_aux_pos > 0) cigar_aux_pos++;
+		cache_cigar_aux[cigar_aux_pos] = '\0';
+			//if(distance == 0) printf("pair %d cache cigar aux 2 %s\n", pair, cache_cigar_aux);
 		mram_write(cache_cigar_aux, (__mram_ptr void *) cma_cigar, BLOCK_SIZE_INPUTS);				
 		
 		// Write back te results to HOST
@@ -336,8 +334,8 @@ int main_kernel1() {
 
 	}
 
-	#if PERF
-	result->counter = timer_stop(&counter);
+	#if PERF_MAIN
+	result->main += timer_stop(&counter);
 	#endif
 	return 0;
 }

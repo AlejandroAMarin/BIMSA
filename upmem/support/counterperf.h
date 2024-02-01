@@ -9,6 +9,12 @@ typedef struct perfcounter_cycles{
 }perfcounter_cycles;
 
 void timer_start(perfcounter_cycles *cycles){
+    #if PERF_CYCLES
+    perfcounter_config(COUNT_CYCLES, true);
+    #endif
+    #if PERF_INSTRUCTIONS
+    perfcounter_config(COUNT_INSTRUCTIONS, true);
+    #endif
     cycles->start = perfcounter_get(); // START TIMER
 }
 

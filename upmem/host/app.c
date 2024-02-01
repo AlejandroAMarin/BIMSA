@@ -72,7 +72,6 @@ static bool read_sequence_metadata(char* input_filename, uint64_t* num_pairs, ui
 	}
 
 	(*longest_seq)--;
-	*longest_seq= 1088;
     // Close the file
     fclose(file);
 

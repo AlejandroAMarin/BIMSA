@@ -251,12 +251,12 @@ void run_set(char* patterns, char* texts,
 			start(timer, 1, rep - n_warmup);
 
 		printf("\n[INFO] " ANSI_COLOR_BLUE "set number: \t %d" ANSI_COLOR_RESET "\n", set);
-		printf("[INFO] " ANSI_COLOR_BLUE "num_dpus: \t %d" ANSI_COLOR_RESET "\n", nr_dpus_set);
+		printf("[INFO] " ANSI_COLOR_BLUE "num_dpus required: \t %d" ANSI_COLOR_RESET "\n", nr_dpus_set);
 		printf("[INFO] " ANSI_COLOR_BLUE "num_pairs: \t %ld" ANSI_COLOR_RESET "\n", num_pairs);
 		printf("[INFO] " ANSI_COLOR_BLUE "longest_sequence: %ld" ANSI_COLOR_RESET "\n", longest_seq);
 		printf("[INFO] Pairs per DPU (adjusted): (%ld)\n", num_pairs_per_dpu);
 		printf("[INFO] Total WRAM usage: (%d) bytes \n", NR_TASKLETS * (BLOCK_SIZE*5 + BLOCK_SIZE_INPUTS*6 + 8 + STACK_SIZE_DEFAULT));
-		printf("[INFO] Reading input... OK.\n");
+		printf("[INFO] Reading input... "ANSI_COLOR_GREEN "OK" ANSI_COLOR_RESET".\n");
 		printf("[INFO] Allocating DPUs... ");
 		fflush(stdout);
 
@@ -264,37 +264,32 @@ void run_set(char* patterns, char* texts,
 		DPU_ASSERT(dpu_load(*dpu_set, DPU_BINARY, NULL));
 		DPU_ASSERT(dpu_get_nr_dpus(*dpu_set, nr_of_dpus));
 
-		printf("OK.\n");
-		printf("[INFO] " ANSI_COLOR_BLUE "num_dpus:%d" ANSI_COLOR_RESET "\n", *nr_of_dpus);
+		printf("\n[INFO] " ANSI_COLOR_BLUE "num_dpus allocated: %d" ANSI_COLOR_RESET "\n", *nr_of_dpus);
 
 		unsigned int kernel = 0;
 		dpu_arguments_t input_arguments = {longest_seq, num_pairs_per_dpu, threshold, kernel};
 		uint32_t i = 0;
 		struct dpu_set_t dpu;
+		printf("[INFO] Transferring inputs to DPUs... ");
 
 		// Copy input arguments to dpu
 		DPU_FOREACH(*dpu_set, dpu) {
 			DPU_ASSERT(dpu_copy_to(dpu, "DPU_INPUT_ARGUMENTS", 0, (const void *) &input_arguments, sizeof(input_arguments)));
 			i++;
 		}
-		printf("DEBUG 1\n");
-		fflush(stdout);
+
 		i = 0;
 		*mem_offset = BLOCK_SIZE_INPUTS; // offset points to first MRAM address
 		// printf("[VERBOSE] HOST ma pattern %d\n", mem_offset[set]);
 		// Patterns transfer
-		printf("DEBUG 2\n");
-		fflush(stdout);
 		DPU_FOREACH(*dpu_set, dpu, i)
 		{
 			DPU_ASSERT(dpu_prepare_xfer(dpu, patterns + i * num_pairs_per_dpu * longest_seq));
 		}
-		printf("DEBUG 3\n");
-		fflush(stdout);
+
 		DPU_ASSERT(dpu_push_xfer(*dpu_set, DPU_XFER_TO_DPU, DPU_MRAM_HEAP_POINTER_NAME, *mem_offset, longest_seq * num_pairs_per_dpu * sizeof(char), DPU_XFER_DEFAULT));
 		// printf("[VERBOSE] HOST pattern sent %ld bytes\n", longest_seq[set] * num_pairs_per_dpu[set] * sizeof(char));
-		printf("DEBUG 4\n");
-		fflush(stdout);
+
     	i = 0;
 		*mem_offset += (longest_seq * num_pairs_per_dpu * sizeof(char)); // of
 		// printf("[VERBOSE] HOST ma texts %d\n", mem_offset[set]);
@@ -305,8 +300,7 @@ void run_set(char* patterns, char* texts,
 
 		DPU_ASSERT(dpu_push_xfer(*dpu_set, DPU_XFER_TO_DPU, DPU_MRAM_HEAP_POINTER_NAME, *mem_offset, longest_seq * num_pairs_per_dpu * sizeof(char), DPU_XFER_DEFAULT));
 		// printf("[VERBOSE] HOST text sent %ld bytes\n", longest_seq[set] * num_pairs_per_dpu[set] * sizeof(char));
-		printf("DEBUG 5\n");
-		fflush(stdout);
+
 		i = 0;
 		*mem_offset += (longest_seq * num_pairs_per_dpu * sizeof(char)); // offset points to end of texts array
 		// printf("[VERBOSE] HOST ma pattern lenghts %d\n", mem_offset[set]);
@@ -338,7 +332,7 @@ void run_set(char* patterns, char* texts,
 
 		if (rep >= n_warmup)
 			stop(timer, 1);
-		printf("OK.\n");
+		printf(""ANSI_COLOR_GREEN "OK" ANSI_COLOR_RESET".\n");
 		// Run kernel on DPUs
 
 		if (rep >= n_warmup)
@@ -358,15 +352,20 @@ void run_set(char* patterns, char* texts,
 void retrieve_results(struct dpu_set_t dpu_set, int32_t* dpu_distances,
 					uint64_t num_pairs_per_dpu, uint64_t offsets_size_per_tl,
 					uint64_t mem_offset, char* cigar, uint64_t cigar_length,
-					Timer* timer, uint32_t rep, uint32_t n_warmup){
+					Timer* timer, uint32_t rep, uint32_t n_warmup, uint32_t nr_of_dpus){
 
 	printf("[INFO] Retrieving results to host... ");
 	fflush(stdout);
 	struct dpu_set_t dpu;
 	if (rep >= n_warmup)
 		start(timer, 3, rep - n_warmup);
+	
 	#if PERF
-	dpu_results_t results[p.num_sets][nr_of_dpus[set]];
+	double cc;
+    double cc_min;
+	cc = 0;
+    cc_min = 0;
+	dpu_results_t results[nr_of_dpus];
 	#endif
 	int i = 0;
 	// Copy back the DPU results (mem_offset[set] already points to the results starting memory position)
@@ -375,14 +374,30 @@ void retrieve_results(struct dpu_set_t dpu_set, int32_t* dpu_distances,
 		DPU_ASSERT(dpu_prepare_xfer(dpu, dpu_distances + i * num_pairs_per_dpu));
 
 		#if PERF
-		results[i].counter = 0;
+		dpu_results_t result;
+		results[i].main = 0;
+		results[i].overlap = 0;
+		results[i].base_case = 0;
+		results[i].compute = 0;
+		results[i].extend = 0;
 		// Retrieve tasklet timings
 		for (unsigned int each_tasklet = 0; each_tasklet < NR_TASKLETS; each_tasklet++) {
-			dpu_results_t result;
-			result.counter = 0;
+			// results[i].main = 0;
+			// results[i].overlap = 0;
+			// results[i].base_case = 0;
+			// results[i].compute = 0;
+			// results[i].extend = 0;
 			DPU_ASSERT(dpu_copy_from(dpu, "DPU_RESULTS", each_tasklet * sizeof(dpu_results_t), &result, sizeof(dpu_results_t)));
-			if (result.counter > results[i].counter)
-				results[i].counter = result.counter;
+			if (result.main > results->main)
+			 	results[i].main = result.main;
+			if (result.overlap > results[i].overlap)
+				results[i].overlap = result.overlap;
+			if (result.base_case > results[i].base_case)
+				results[i].base_case = result.base_case;
+			if (result.compute > results->compute)
+				results[i].compute = result.compute;
+			if (result.extend > results[i].extend)
+				results[i].extend = result.extend;
 		}
 		#endif
 	}
@@ -395,18 +410,91 @@ void retrieve_results(struct dpu_set_t dpu_set, int32_t* dpu_distances,
 	uint64_t max_cycles = 0;
 	uint64_t min_cycles = 0xFFFFFFFFFFFFFFFF;
 	// Print performance results
-	if(rep >= p.n_warmup){
+	if(rep >= n_warmup){
 		i = 0;
 		DPU_FOREACH(dpu_set, dpu) {
-			if(results[i].counter > max_cycles)
-				max_cycles = results[i].counter;
-			if(results[i].counter < min_cycles)
-				min_cycles = results[i].counter;
+			if(results[i].main > max_cycles)
+				max_cycles = results[i].main;
+			if(results[i].main < min_cycles)
+				min_cycles = results[i].main;
 			i++;
 		}
-		cc += (double)max_cycles;
-		cc_min += (double)min_cycles;
+		cc = (double)max_cycles;
+		cc_min = (double)min_cycles;
 	}
+	printf("\n[PERF] DPU kernel perf main: %g\n", cc);
+	max_cycles = 0;
+	min_cycles = 0xFFFFFFFFFFFFFFFF;
+	cc = 0;
+	cc_min = 0;
+	// Print performance results
+	if(rep >= n_warmup){
+		i = 0;
+		DPU_FOREACH(dpu_set, dpu) {
+			if(results[i].overlap > max_cycles)
+				max_cycles = results[i].overlap;
+			if(results[i].overlap < min_cycles)
+				min_cycles = results[i].overlap;
+			i++;
+		}
+		cc = (double)max_cycles;
+		cc_min = (double)min_cycles;
+	}
+	printf("[PERF] DPU kernel perf overlap: %g\n", cc);
+	max_cycles = 0;
+	min_cycles = 0xFFFFFFFFFFFFFFFF;
+	cc = 0;
+	cc_min = 0;
+	// Print performance results
+	if(rep >= n_warmup){
+		i = 0;
+		DPU_FOREACH(dpu_set, dpu) {
+			if(results[i].base_case > max_cycles)
+				max_cycles = results[i].base_case;
+			if(results[i].base_case < min_cycles)
+				min_cycles = results[i].base_case;
+			i++;
+		}
+		cc = (double)max_cycles;
+		cc_min = (double)min_cycles;
+	}
+	printf("[PERF] DPU kernel perf base_case: %g\n", cc);
+	max_cycles = 0;
+	min_cycles = 0xFFFFFFFFFFFFFFFF;
+	cc = 0;
+	cc_min = 0;
+	// Print performance results
+	if(rep >= n_warmup){
+		i = 0;
+		DPU_FOREACH(dpu_set, dpu) {
+			if(results[i].compute > max_cycles)
+				max_cycles = results[i].compute;
+			if(results[i].compute < min_cycles)
+				min_cycles = results[i].compute;
+			i++;
+		}
+		cc = (double)max_cycles;
+		cc_min = (double)min_cycles;
+	}
+	printf("[PERF] DPU kernel perf compute: %g\n", cc);
+	max_cycles = 0;
+	min_cycles = 0xFFFFFFFFFFFFFFFF;
+	cc = 0;
+	cc_min = 0;
+	// Print performance results
+	if(rep >= n_warmup){
+		i = 0;
+		DPU_FOREACH(dpu_set, dpu) {
+			if(results[i].extend > max_cycles)
+				max_cycles = results[i].extend;
+			if(results[i].extend < min_cycles)
+				min_cycles = results[i].extend;
+			i++;
+		}
+		cc = (double)max_cycles;
+		cc_min = (double)min_cycles;
+	}
+	printf("[PERF] DPU kernel perf extend: %g\n", cc);
 	#endif
 
 	// move mem offset to the end of the 4 wavefronts
@@ -424,14 +512,14 @@ void retrieve_results(struct dpu_set_t dpu_set, int32_t* dpu_distances,
 	if(rep >= n_warmup)
 		stop(timer, 3);
 
-	printf("OK.\n");
+	printf(""ANSI_COLOR_GREEN "OK" ANSI_COLOR_RESET".\n");
 	#if PRINT
 	printf("LOGS\n");
 	DPU_FOREACH(dpu_set, dpu) {
 		DPU_ASSERT(dpu_log_read(dpu, stdout));
 	}
 	#endif
-	printf("QUE?\n");
+	DPU_ASSERT(dpu_free(dpu_set));
 }
 
 void validate_results(char* patterns, char* texts,
@@ -439,9 +527,6 @@ void validate_results(char* patterns, char* texts,
 			uint64_t num_pairs, int64_t longest_seq, struct dpu_set_t dpu_set,
 			char* cigar, uint64_t cigar_length,
 			int32_t* dpu_distances, Timer timer, int set, uint32_t n_reps){
-
-	printf("Validating results started\n");
-	fflush(stdout);
 
 	// Print timing results
 	printf("\n[TIME] CPU-DPU (ms): ");
@@ -451,9 +536,8 @@ void validate_results(char* patterns, char* texts,
 	printf("\n[TIME] DPU-CPU Time (ms): ");
 	print(&timer, 3, n_reps);
 	printf("\n");
-	#if PERF
-	printf("[PERF] DPU kernel perf data: %g\n", cc);
-	#endif
+	printf("[INFO] Validating Results for set %d ...\n", set);
+
 	FILE * output;
 	// Result validation
 	int valid = 0;
@@ -462,7 +546,6 @@ void validate_results(char* patterns, char* texts,
 	int distance_failed = 0;
 	int over_distance = 0;
 	output = fopen("dpu_output", "w");
-	printf("[INFO] Validating results for set %d ...\n", set);
 	#pragma omp parallel
 	{
 	char* cigar_debug = (char*)malloc(cigar_length * sizeof(char));
@@ -489,7 +572,7 @@ void validate_results(char* patterns, char* texts,
 		{
 			#if DEBUG
 			printf("[" ANSI_COLOR_RED "ERR-" ANSI_COLOR_RESET "] "ANSI_COLOR_RED"Mismatch result at index %d: dpu_distance=%d cigar_distance=%d\n" ANSI_COLOR_RESET, j,dpu_distances[j], cigar_d);
-			printf("Printing wrowng CIGAR: %s\n",cigar_debug);
+			printf("Printing wrong CIGAR: %s\n",cigar_debug);
 			#endif
 			distance_failed++;
 		}
@@ -520,7 +603,6 @@ void validate_results(char* patterns, char* texts,
 		//printf("[" ANSI_COLOR_YELLOW "Valid" ANSI_COLOR_RESET "] Valid pairs %d.\n", valid);
 	}
 	if(over_distance>0) printf("[" ANSI_COLOR_YELLOW "ERR-" ANSI_COLOR_RESET "] %d pairs have a higher error than the maximum stipulated.\n", over_distance);
-	DPU_ASSERT(dpu_free(dpu_set));
 }
 
 int main(int argc, char **argv){
@@ -544,31 +626,26 @@ int main(int argc, char **argv){
 
     return 0;
 	}
-	printf("[INFO] Reading input file...\n");
-	printf("[INFO] " ANSI_COLOR_BLUE "Input file: %s" ANSI_COLOR_RESET "\n", p.input_file);
-	fflush(stdout);
-	ewf_offset_t threshold = (ewf_offset_t)sqrt(1*BLOCK_SIZE);
+	ewf_offset_t threshold = (ewf_offset_t)sqrt(3*BLOCK_SIZE);
+	printf("[INFO] Threshold %d\n",threshold);
 	bool file_status;
-
+	printf("[INFO] sets %d\n",p.sets[0]);
 	if(NR_TASKLETS * (BLOCK_SIZE*5 + BLOCK_SIZE_INPUTS*6 + 8 + STACK_SIZE_DEFAULT) > WRAM_LIMIT){
 		printf("[ERROR] Exceeded WRAM capacity, reconfigure BL/BLI/NR_TASKLETS");
 		return 0;
 	}
 
 	printf("[INFO] Number of sets %d\n", p.num_sets);
+	printf("[INFO] " ANSI_COLOR_BLUE "Input file: %s" ANSI_COLOR_RESET "\n", p.input_file);
+	printf("[INFO] Reading input file...\n");
+	fflush(stdout);
 	// Timer declaration
 	Timer timer[p.num_sets];
+	Timer initialization;
+	//start(&initialization, 1, 1);
 	struct dpu_set_t* dpu_set = (struct dpu_set_t*)malloc(p.num_sets * sizeof(struct dpu_set_t));
 	uint32_t nr_of_dpus[p.num_sets];
 	int set=0;
-	#if PERF
-	double cc[p.num_sets];
-    double cc_min[p.num_sets];
-	for(set=0; set<p.num_sets; set++){
-	cc[set] = 0;
-    cc_min[set] = 0;
-	}
-	#endif
 
 	// Allocate and create input data
 	// All patterns and text are allocated of the maximum size, then read only the required size
@@ -617,14 +694,19 @@ int main(int argc, char **argv){
 		memset(text_lengths[set],    0, 1000 * sizeof(uint32_t));
 
 	}
-
+	//stop(&initialization, 1);
+	start(&initialization, 1, 1);
   	file_status = read_sequence_data(p.input_file, patterns, texts,
 						pattern_lengths, text_lengths,
 						p.num_sets, num_pairs, longest_seq, p.max_pairs);
 	assert(file_status);
+	stop(&initialization, 1);
+	printf("[TIME] Reading input file (ms): ");
+	print(&initialization, 1, 1);
+	printf("\n");
 	// printf("[VERBOSE] num pairs %ld and longest seq %ld\n", num_pairs[set], longest_seq[set]);
 
-
+	start(&initialization, 1, 1);
 	int32_t unused_dpus = 0;
 	int32_t current_dpus = NR_DPUS;
 	int64_t total_bytes_size = 0;
@@ -711,9 +793,12 @@ int main(int argc, char **argv){
 		+ num_pairs_per_dpu[set] * cigar_length[set] * sizeof(char) // cigars
 		+ NR_TASKLETS * (cigar_length[set] + 8) // cigar tmp
 		+ NR_TASKLETS*QUEUE_SZ; // task queue
+		
+		printf("[INFO] mram usage vs MRAM_LIMIT %ld/%d\n", mram_usage[set], MRAM_LIMIT);
 
 		while (mram_usage[set] > MRAM_LIMIT)
 		{
+			set_partitions[set]++;
 			mram_usage[set] = BLOCK_SIZE_INPUTS // starting offset
 			+ 2 * (longest_seq[set] * (num_pairs_per_dpu[set] / set_partitions[set])  * sizeof(char)) // patterns and texts
 			+ 2 * ((num_pairs_per_dpu[set] / set_partitions[set]) * sizeof(uint32_t)) // pattern and text lengths
@@ -723,7 +808,10 @@ int main(int argc, char **argv){
 			+ NR_TASKLETS * (cigar_length[set] + 8) // cigar tmp
 			+ NR_TASKLETS*QUEUE_SZ; // task queue
 			queued_sets++;
-			set_partitions[set]++;
+			if (set_partitions[set] > 10){
+				printf("[ERROR] set is way too large for the DPUS to process, consider creating different sets or reducing file size \n");
+				return 0;
+			}
 		}
 
 		if(set_partitions[set] > 1){
@@ -846,7 +934,10 @@ int main(int argc, char **argv){
 				queue++;
 			}
 	}
-
+	// stop(&initialization, 1);
+	// printf("[TIME] Initializing variables (ms): ");
+	// print(&initialization, 1, 1);
+	// printf("\n");
 
 for (uint32_t rep = 0; rep < p.n_warmup + p.n_reps; rep++) { // Loop adding compute weight and warmup
 	for(set=0; set<p.num_sets; set++){
@@ -867,6 +958,7 @@ for (uint32_t rep = 0; rep < p.n_warmup + p.n_reps; rep++) { // Loop adding comp
 	uint64_t Qmram_usage;
 	uint32_t queue;
 	uint64_t debug_running=1;
+	struct dpu_set_t dpu_fail;
 
 	if (NR_DPUS >= p.num_sets){
 		while(finished_sets<p.num_sets + queued_sets){
@@ -874,7 +966,11 @@ for (uint32_t rep = 0; rep < p.n_warmup + p.n_reps; rep++) { // Loop adding comp
 				if(!finished_set[set]) dpu_status(dpu_set[set], &set_finished, &set_failed);
 				if(set_failed){
 					printf("[ERROR] SET %d FAILED\n", set);
-					return 1;
+					DPU_FOREACH(dpu_set[set], dpu_fail) {
+						DPU_ASSERT(dpu_log_read(dpu_fail, stdout));
+					}
+					DPU_ASSERT(dpu_free(dpu_set[set]));
+					return 0;
 				}
 				if (set_finished)
 				{
@@ -893,23 +989,21 @@ for (uint32_t rep = 0; rep < p.n_warmup + p.n_reps; rep++) { // Loop adding comp
 					retrieve_results(dpu_set[set], dpu_distances[set],
 						num_pairs_per_dpu[set], offsets_size_per_tl[set],
 						mem_offset[set], cigar[set], cigar_length[set],
-						&timer[set], rep, p.n_warmup);
+						&timer[set], rep, p.n_warmup, nr_of_dpus[set]);
 				}
 			}
 			if(queued_sets<=0) continue;
 			for(queue=0; queue<queued_sets; queue++){
 				//if(queue == 1) continue;
 				if(finished_queue[queue]) continue;
-				printf("DEBUG 2 queue %d\n", queue);
 				if(execution_queue[queue]) dpu_status(Qdpu_set[queue], &set_finished, &set_failed);
-				printf("DEBUG after status queue %d\n", queue);
 				if(set_failed){
 					printf("[ERROR] QUEUED SET %d FAILED\n", queue);
+					DPU_ASSERT(dpu_free(Qdpu_set[queue]));
 					return 1;
 				}
 				if (set_finished)
 				{
-					printf("DEBUG SET FINISHED queue %d\n", queue);
 					finished_sets++;
 					finished_queue[queue] = true;
 					dpus_free += Qnr_dpus_set[queue];
@@ -926,14 +1020,10 @@ for (uint32_t rep = 0; rep < p.n_warmup + p.n_reps; rep++) { // Loop adding comp
 					retrieve_results(Qdpu_set[queue], Qdpu_distances[queue],
 						Qnum_pairs_per_dpu[queue], Qoffsets_size_per_tl[queue],
 						Qmem_offset[queue], Qcigar[queue], Qcigar_length[queue],
-						&Qtimer[queue], rep, p.n_warmup);
-					printf("FINISHED retrieveing results\n");
-					fflush(stdout);
+						&Qtimer[queue], rep, p.n_warmup, nr_of_dpus[set]);
 					continue;
 				}
-				printf("DEBUG before dpu check queue %d dpus required %d\n", queue, Qnr_dpus_set[queue]);
 				if(dpus_free < Qnr_dpus_set[queue]) continue;
-				printf("DEBUG dpus free %d dpus required %d\n", dpus_free, Qnr_dpus_set[queue]);
 				flt_num_pairs_per_dpu = (float) Qnum_pairs[queue] / (float) Qnr_dpus_set[queue];
 				Qnum_pairs_per_dpu[queue] = (uint64_t) flt_num_pairs_per_dpu;
 				reminder = fmod(flt_num_pairs_per_dpu, (float) NR_TASKLETS*2);
@@ -954,11 +1044,8 @@ for (uint32_t rep = 0; rep < p.n_warmup + p.n_reps; rep++) { // Loop adding comp
 		}
 	}
 }
-
 for(set=0; set<p.num_sets; set++){
 	if(num_pairs[set]==0) continue;
-	printf("Before validating\n");
-	fflush(stdout);
 	validate_results(patterns[set], texts[set],
 			pattern_lengths[set], text_lengths[set],
 			num_pairs[set], longest_seq[set], dpu_set[set],

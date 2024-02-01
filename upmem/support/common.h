@@ -117,7 +117,11 @@ typedef struct {
 } pair_meta_t; // 64 bytes
 
 typedef struct {
-    uint64_t counter;
+    uint64_t overlap;
+    uint64_t base_case;
+    uint64_t compute;
+    uint64_t extend;
+    uint64_t main;
 } dpu_results_t;
 
 #ifndef ENERGY
@@ -129,7 +133,7 @@ typedef struct {
 #define BASE_BAND 10
 #define MIN_WFA_LEN 10
 #define MAX_DISTANCE_THRESHOLD 50
-#define MAX_ERROR 0.25
+#define MAX_ERROR 0.20
 
 #define ANSI_COLOR_RED     "\x1b[31m"
 #define ANSI_COLOR_GREEN   "\x1b[32m"
