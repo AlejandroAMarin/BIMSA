@@ -87,7 +87,7 @@ void opt_umem_wfa_extend(int k_min, int k_max,
 	// Extend diagonally each wavefront point
 	// Initialize wavefront cache
 	cma_wf_offsets = (ma_wf_offsets + ((k_min + max_distance) * sizeof(ewf_offset_t))); 
-	mram_read_aligned(&cma_wf_offsets, cache_wavefront_offsets, &read_idx_wf, BLOCK_SIZE, TYPE_BYTES_SIZE);
+	mram_read_aligned(&cma_wf_offsets, cache_wavefront_offsets, &read_idx_wf, WF_TRANSFER, TYPE_BYTES_SIZE);
 
 	// Iterate between k_min and k_max
 	for (k = k_min; k <= k_max; ++k)
@@ -98,26 +98,26 @@ void opt_umem_wfa_extend(int k_min, int k_max,
 
 		// Init pattern chars cache
 		cma_pattern = ma_pattern_start + v * sizeof(char);
-		mram_read_aligned(&cma_pattern, cache_pattern, &read_idx_patt_char, BLOCK_SIZE_INPUTS, 1);
+		mram_read_aligned(&cma_pattern, cache_pattern, &read_idx_patt_char, SEQ_TRANSFER, 1);
 
 		// Init text chars cache
 		cma_text  = ma_text_start + h * sizeof(char);
-		mram_read_aligned(&cma_text, cache_text, &read_idx_text_char, BLOCK_SIZE_INPUTS, 1);
+		mram_read_aligned(&cma_text, cache_text, &read_idx_text_char, SEQ_TRANSFER, 1);
 
 		// Assume 32 bytes, so we'll process in chunks of 8 bytes (64 bits)
 		int loop = 1;
-		printf("[DPU] debugging... \nCache pattern: %s \nCache pattern: %s \nIndex: %d\n",cache_pattern, cache_pattern + read_idx_patt_char, read_idx_patt_char);
-		printf("[DPU] debugging... \nCache text: %s \nCache text: %s \nIndex: %d\n",cache_text, cache_text + read_idx_text_char, read_idx_text_char);
-		// Cast char arrays to uint64_t for easier comparison
+		// printf("[DPU] debugging... \nCache pattern: %s \nCache pattern: %s \nIndex: %d\n",cache_pattern, cache_pattern + read_idx_patt_char, read_idx_patt_char);
+		// printf("[DPU] debugging... \nCache text: %s \nCache text: %s \nIndex: %d\n",cache_text, cache_text + read_idx_text_char, read_idx_text_char);
+		// // Cast char arrays to uint64_t for easier comparison
 		uint64_t *patternPtr = (uint64_t *)(cache_pattern + read_idx_patt_char);
 		uint64_t *textPtr = (uint64_t *)(cache_text + read_idx_text_char);
-		printf("[DPU] pattern ptr %d text ptr %d\n", patternPtr, textPtr);
+		// printf("[DPU] pattern ptr %d text ptr %d\n", patternPtr, textPtr);
 		while (v < pattern_length && h < text_length && loop){
 			const int shorter_end = read_idx_patt_char != 0 || read_idx_text_char != 0;
-			for (int i = 0; i < BLOCK_SIZE_INPUTS/8 - shorter_end; i++) { // Assuming 32 bytes (4 chunks of 8 bytes)
-				printf("[DPU] pattern ptr %ld text ptr %ld\n", patternPtr[i], textPtr[i]);
+			for (int i = 0; i < SEQ_TRANSFER/8 - shorter_end; i++) { // Assuming 32 bytes (4 chunks of 8 bytes)
+				// printf("[DPU] pattern ptr %ld text ptr %ld\n", patternPtr[i], textPtr[i]);
 				const uint64_t cmp = patternPtr[i] ^ textPtr[i];
-				printf("[DPU] loop index %d loop limit %d\n", i, BLOCK_SIZE_INPUTS/8 - shorter_end);
+				// printf("[DPU] loop index %d loop limit %d\n", i, SEQ_TRANSFER/8 - shorter_end);
 				if (cmp == 0) {
 					cache_wavefront_offsets[read_idx_wf] += 8;
 					v += 8;
@@ -125,19 +125,19 @@ void opt_umem_wfa_extend(int k_min, int k_max,
 					continue;
 				} else {
 					cache_wavefront_offsets[read_idx_wf] += __builtin_ctzl(cmp)/8;
-					printf("[DPU] INFO leading zero trail is %d\n", __builtin_ctzl(cmp)/8);
-					printf("[DPU] INFO mismatch at position %d\n", cache_wavefront_offsets[read_idx_wf]);
+					// printf("[DPU] INFO leading zero trail is %d\n", __builtin_ctzl(cmp)/8);
+					// printf("[DPU] INFO mismatch at position %d\n", cache_wavefront_offsets[read_idx_wf]);
 					loop = 0;
 					break;
 				}
 			}
 			
-			cma_text += BLOCK_SIZE_INPUTS - shorter_end * 8;
-			cma_pattern += BLOCK_SIZE_INPUTS - shorter_end * 8;
-			mram_read_aligned(&cma_text, cache_text, &read_idx_text_char, BLOCK_SIZE_INPUTS, 1);
-			cma_pattern += BLOCK_SIZE_INPUTS;
-			mram_read_aligned(&cma_text, cache_text, &read_idx_text_char, BLOCK_SIZE_INPUTS, 1);
-			cma_text += BLOCK_SIZE_INPUTS;
+			cma_text += SEQ_TRANSFER - shorter_end * 8;
+			cma_pattern += SEQ_TRANSFER - shorter_end * 8;
+			mram_read_aligned(&cma_text, cache_text, &read_idx_text_char, SEQ_TRANSFER, 1);
+			cma_pattern += SEQ_TRANSFER;
+			mram_read_aligned(&cma_text, cache_text, &read_idx_text_char, SEQ_TRANSFER, 1);
+			cma_text += SEQ_TRANSFER;
 			patternPtr = (uint64_t *)cache_pattern + read_idx_patt_char;
 			textPtr = (uint64_t *)cache_text + read_idx_text_char;
 		}
@@ -148,24 +148,126 @@ void opt_umem_wfa_extend(int k_min, int k_max,
 		if(read_idx_wf == loop_limit)
 		{
 			//profiling_start(&mem_write);
-			mram_write(cache_wavefront_offsets, (__mram_ptr void *) cma_wf_offsets, BLOCK_SIZE);
+			mram_write(cache_wavefront_offsets, (__mram_ptr void *) cma_wf_offsets, WF_TRANSFER);
 			//profiling_stop&mem_write);
-			cma_wf_offsets += BLOCK_SIZE;
+			cma_wf_offsets += WF_TRANSFER;
 			//profiling_start&mem_read);
-			mram_read((__mram_ptr void *) cma_wf_offsets, cache_wavefront_offsets, BLOCK_SIZE);
+			mram_read((__mram_ptr void *) cma_wf_offsets, cache_wavefront_offsets, WF_TRANSFER);
 			//profiling_stop&mem_read);
 			read_idx_wf = 0;
 		}
 	}
 	// Write back the latest updates to wavefront cache
 	//profiling_start(&mem_write);
-	mram_write(cache_wavefront_offsets,(__mram_ptr void *) cma_wf_offsets, BLOCK_SIZE);
+	mram_write(cache_wavefront_offsets,(__mram_ptr void *) cma_wf_offsets, WF_TRANSFER);
 	//profiling_stop&mem_write);
 	//profiling_stop(&extend);
 	#if PERF_SECTIONS
 	result->extend += timer_stop(&counter);
 	#endif
 }
+
+// void opt2_umem_wfa_extend(int k_min, int k_max,
+// 	uint32_t loop_limit, ewf_offset_t max_distance, 
+// 	int32_t pattern_length, int32_t text_length, 
+// 	uint32_t ma_pattern_start, uint32_t ma_text_start, 
+// 	uint32_t ma_wf_offsets, 
+// 	char* cache_pattern, char* cache_text, ewf_offset_t* cache_wavefront_offsets, dpu_results_t* result){
+// 	//profiling_start(&extend);
+// 	#if PERF_SECTIONS
+// 	perfcounter_cycles counter;
+// 	timer_start(&counter);
+// 	#endif
+// 	int32_t k, v, h;
+// 	uint16_t read_idx_patt_char;
+// 	uint16_t read_idx_text_char;
+// 	uint16_t read_idx_wf;
+// 	uint32_t cma_wf_offsets;
+// 	uint32_t cma_pattern;
+// 	uint32_t cma_text;
+// 	// Extend diagonally each wavefront point
+// 	// Initialize wavefront cache
+// 	cma_wf_offsets = (ma_wf_offsets + ((k_min + max_distance) * sizeof(ewf_offset_t))); 
+// 	mram_read_aligned(&cma_wf_offsets, cache_wavefront_offsets, &read_idx_wf, WF_TRANSFER, TYPE_BYTES_SIZE);
+
+// 	// Iterate between k_min and k_max
+// 	for (k = k_min; k <= k_max; ++k)
+// 	{
+// 		const int bases_to_cmp = 16;
+// 		int acc = 0;
+		
+// 		// Init v and h
+// 		v = EWAVEFRONT_V(k, cache_wavefront_offsets[read_idx_wf]);
+// 		h = EWAVEFRONT_H(k, cache_wavefront_offsets[read_idx_wf]);
+
+// 		while (v < plen && h < tlen) {
+// 			// read and get the displacement for both words (displacement = read_idx_xx_char)
+// 			cma_pattern = ma_pattern_start + v * sizeof(char);
+// 			mram_read_aligned(&cma_pattern, cache_pattern, &read_idx_patt_char, SEQ_TRANSFER, 1);
+// 			cma_text  = ma_text_start + h * sizeof(char);
+// 			mram_read_aligned(&cma_text, cache_text, &read_idx_text_char, SEQ_TRANSFER, 1);
+
+// 			// 0xffffffffffffff00
+// 			//uintptr_t alignment_mask = (uintptr_t)-1 << 2;
+// 			uint32_t* word_p_ptr = (uint32_t*)cache_pattern;
+// 			uint32_t* next_word_p_ptr = word_p_ptr + 1;
+// 			uint32_t* word_t_ptr = (uint32_t*)cache_text;
+// 			uint32_t* next_word_t_ptr = word_t_ptr + 1;
+
+// 			// * 2 because each element is 2 bits
+// 			uint32_t sub_word_p_1 = *word_p_ptr;
+// 			uint32_t sub_word_p_2 = *next_word_p_ptr;
+// 			sub_word_p_1 = sub_word_p_1 << (read_idx_patt_char * 2);
+
+// 			// Convert the u32 to big-endian, as little endian inverts the order
+// 			// for the sequences.
+// 			sub_word_p_2 = *next_word_p_ptr;
+// 			// Cast to uint64_t is done to avoid undefined behaviour in case
+// 			// it's shifted by 32 elements.
+// 			// ----
+// 			// The type of the result is that of the promoted left operand. The
+// 			// behavior is undefined if the right operand is negative, or
+// 			// greater than or equal to the length in bits of the promoted left
+// 			// operand.
+// 			// ----
+// 			sub_word_p_2 = ((uint64_t)sub_word_p_2) >> ((bases_to_cmp - read_idx_patt_char) * 2);
+			
+// 			uint32_t sub_word_t_1 = *word_t_ptr;
+// 			sub_word_t_1 = sub_word_t_1 << (text_displacement * 2);
+// 			uint32_t sub_word_t_2 = *next_word_t_ptr;
+// 			sub_word_t_2 = ((uint64_t)sub_word_t_2) >> ((bases_to_cmp - text_displacement) * 2);
+
+// 			const uint32_t word_p = sub_word_p_1 | sub_word_p_2;
+// 			const uint32_t word_t = sub_word_t_1 | sub_word_t_2;
+
+// 			uint32_t diff = word_p ^ word_t;
+// 			// Branchless method to remove the equal bits if we read "too far away"
+// 			uint32_t full_mask = (uint32_t)-1;
+// 			const int next_v = v + bases_to_cmp;
+// 			const int next_h = h + bases_to_cmp;
+// 			const uint32_t mask_p = full_mask << ((next_v - pattern_length) * 2 * (next_v > pattern_length));
+// 			const uint32_t mask_t = full_mask << ((next_h - text_length) * 2 * (next_h > text_length));
+// 			diff = diff | ~mask_p | ~mask_t;
+
+// 			int lz = __clz(diff);
+
+// 			// each element has 2 bits
+// 			const int eq_elements = lz / 2;
+// 			acc += eq_elements;
+
+// 			if (eq_elements < bases_to_cmp) {
+// 				break;
+// 			}
+
+
+// 			v += bases_to_cmp;
+// 			h += bases_to_cmp;
+// 		}
+		
+// 	#if PERF_SECTIONS
+// 	result->extend += timer_stop(&counter);
+// 	#endif
+// }
 
 void umem_wfa_extend(int k_min, int k_max,
 	uint32_t loop_limit, ewf_offset_t max_distance, 
@@ -188,7 +290,7 @@ void umem_wfa_extend(int k_min, int k_max,
 	// Extend diagonally each wavefront point
 	// Initialize wavefront cache
 	cma_wf_offsets = (ma_wf_offsets + ((k_min + max_distance) * sizeof(ewf_offset_t))); 
-	mram_read_aligned(&cma_wf_offsets, cache_wavefront_offsets, &read_idx_wf, BLOCK_SIZE, TYPE_BYTES_SIZE);
+	mram_read_aligned(&cma_wf_offsets, cache_wavefront_offsets, &read_idx_wf, WF_TRANSFER, TYPE_BYTES_SIZE);
 
 	// Iterate between k_min and k_max
 	for (k = k_min; k <= k_max; ++k)
@@ -199,13 +301,13 @@ void umem_wfa_extend(int k_min, int k_max,
 
 		// Init pattern chars cache
 		cma_pattern = ma_pattern_start + v * sizeof(char);
-		mram_read_aligned(&cma_pattern, cache_pattern, &read_idx_patt_char, BLOCK_SIZE_INPUTS, 1);
-		cma_pattern += BLOCK_SIZE_INPUTS;
+		mram_read_aligned(&cma_pattern, cache_pattern, &read_idx_patt_char, SEQ_TRANSFER, 1);
+		cma_pattern += SEQ_TRANSFER;
 
 		// Init text chars cache
 		cma_text  = ma_text_start + h * sizeof(char);
-		mram_read_aligned(&cma_text, cache_text, &read_idx_text_char, BLOCK_SIZE_INPUTS, 1);
-		cma_text += BLOCK_SIZE_INPUTS;
+		mram_read_aligned(&cma_text, cache_text, &read_idx_text_char, SEQ_TRANSFER, 1);
+		cma_text += SEQ_TRANSFER;
 
 		while (v < pattern_length && h < text_length && cache_pattern[read_idx_patt_char]==cache_text[read_idx_text_char])
 		{
@@ -215,22 +317,22 @@ void umem_wfa_extend(int k_min, int k_max,
 			read_idx_patt_char++;
 			read_idx_text_char++;
 
-			if(read_idx_patt_char == BLOCK_SIZE_INPUTS)
+			if(read_idx_patt_char == SEQ_TRANSFER)
 			{
 				//profiling_start&mem_read);
-				mram_read((__mram_ptr void *) cma_pattern, cache_pattern, BLOCK_SIZE_INPUTS);
+				mram_read((__mram_ptr void *) cma_pattern, cache_pattern, SEQ_TRANSFER);
 				//profiling_stop&mem_read);
-				cma_pattern += BLOCK_SIZE_INPUTS;
+				cma_pattern += SEQ_TRANSFER;
 				read_idx_patt_char = 0;
 			}
 
 
-			if(read_idx_text_char == BLOCK_SIZE_INPUTS)
+			if(read_idx_text_char == SEQ_TRANSFER)
 			{
 				//profiling_start&mem_read);
-				mram_read((__mram_ptr void *) cma_text, cache_text, BLOCK_SIZE_INPUTS);
+				mram_read((__mram_ptr void *) cma_text, cache_text, SEQ_TRANSFER);
 				//profiling_stop&mem_read);
-				cma_text += BLOCK_SIZE_INPUTS;
+				cma_text += SEQ_TRANSFER;
 				read_idx_text_char = 0;
 			}
 
@@ -241,18 +343,18 @@ void umem_wfa_extend(int k_min, int k_max,
 		if(read_idx_wf == loop_limit)
 		{
 			//profiling_start(&mem_write);
-			mram_write(cache_wavefront_offsets, (__mram_ptr void *) cma_wf_offsets, BLOCK_SIZE);
+			mram_write(cache_wavefront_offsets, (__mram_ptr void *) cma_wf_offsets, WF_TRANSFER);
 			//profiling_stop&mem_write);
-			cma_wf_offsets += BLOCK_SIZE;
+			cma_wf_offsets += WF_TRANSFER;
 			//profiling_start&mem_read);
-			mram_read((__mram_ptr void *) cma_wf_offsets, cache_wavefront_offsets, BLOCK_SIZE);
+			mram_read((__mram_ptr void *) cma_wf_offsets, cache_wavefront_offsets, WF_TRANSFER);
 			//profiling_stop&mem_read);
 			read_idx_wf = 0;
 		}
 	}
 	// Write back the latest updates to wavefront cache
 	//profiling_start(&mem_write);
-	mram_write(cache_wavefront_offsets,(__mram_ptr void *) cma_wf_offsets, BLOCK_SIZE);
+	mram_write(cache_wavefront_offsets,(__mram_ptr void *) cma_wf_offsets, WF_TRANSFER);
 	//profiling_stop&mem_write);
 	//profiling_stop(&extend);
 	#if PERF_SECTIONS
@@ -281,7 +383,7 @@ void umem_wfa_extend_rv(int k_min, int k_max,
 	// Extend diagonally each wavefront point
 	// Initialize wavefront cache
 	cma_wf_offsets = (ma_wf_offsets + ((k_min + max_distance) * sizeof(ewf_offset_t)));
-	mram_read_aligned(&cma_wf_offsets, cache_wavefront_offsets, &read_idx_wf, BLOCK_SIZE, TYPE_BYTES_SIZE);
+	mram_read_aligned(&cma_wf_offsets, cache_wavefront_offsets, &read_idx_wf, WF_TRANSFER, TYPE_BYTES_SIZE);
 
 	// Iterate between k_min and k_max
 	for (k = k_min; k <= k_max; ++k)
@@ -291,16 +393,16 @@ void umem_wfa_extend_rv(int k_min, int k_max,
 		h = EWAVEFRONT_H(k, cache_wavefront_offsets[read_idx_wf]);
 
 		// Init pattern chars cache
-		cma_pattern = ma_pattern_start + ((pattern_length)-v) * sizeof(char) - BLOCK_SIZE_INPUTS;
-		mram_read_aligned_reverse(&cma_pattern, cache_pattern, &read_idx_patt_char, BLOCK_SIZE_INPUTS, 1);
-		read_idx_patt_char = BLOCK_SIZE_INPUTS -1 + read_idx_patt_char;
-		cma_pattern -= BLOCK_SIZE_INPUTS;
+		cma_pattern = ma_pattern_start + ((pattern_length)-v) * sizeof(char) - SEQ_TRANSFER;
+		mram_read_aligned_reverse(&cma_pattern, cache_pattern, &read_idx_patt_char, SEQ_TRANSFER, 1);
+		read_idx_patt_char = SEQ_TRANSFER -1 + read_idx_patt_char;
+		cma_pattern -= SEQ_TRANSFER;
 
 		// Init text chars cache
-		cma_text  = ma_text_start + ((text_length)-h) * sizeof(char) - BLOCK_SIZE_INPUTS;
-		mram_read_aligned_reverse(&cma_text, cache_text, &read_idx_text_char, BLOCK_SIZE_INPUTS, 1);
-		read_idx_text_char = BLOCK_SIZE_INPUTS -1 + read_idx_text_char;
-		cma_text -= BLOCK_SIZE_INPUTS;
+		cma_text  = ma_text_start + ((text_length)-h) * sizeof(char) - SEQ_TRANSFER;
+		mram_read_aligned_reverse(&cma_text, cache_text, &read_idx_text_char, SEQ_TRANSFER, 1);
+		read_idx_text_char = SEQ_TRANSFER -1 + read_idx_text_char;
+		cma_text -= SEQ_TRANSFER;
 
 		while (v < pattern_length && h < text_length && cache_pattern[read_idx_patt_char]==cache_text[read_idx_text_char])
 		{
@@ -313,20 +415,20 @@ void umem_wfa_extend_rv(int k_min, int k_max,
 			if(read_idx_patt_char < 0)
 			{
 				//profiling_start&mem_read);
-				mram_read((__mram_ptr void *) cma_pattern, cache_pattern, BLOCK_SIZE_INPUTS);
+				mram_read((__mram_ptr void *) cma_pattern, cache_pattern, SEQ_TRANSFER);
 				//profiling_stop&mem_read);
-				cma_pattern -= BLOCK_SIZE_INPUTS;
-				read_idx_patt_char = BLOCK_SIZE_INPUTS - 1;
+				cma_pattern -= SEQ_TRANSFER;
+				read_idx_patt_char = SEQ_TRANSFER - 1;
 			}
 
 
 			if(read_idx_text_char < 0)
 			{
 				//profiling_start&mem_read);
-				mram_read((__mram_ptr void *) cma_text, cache_text, BLOCK_SIZE_INPUTS);
+				mram_read((__mram_ptr void *) cma_text, cache_text, SEQ_TRANSFER);
 				//profiling_stop&mem_read);
-				cma_text -= BLOCK_SIZE_INPUTS;
-				read_idx_text_char = BLOCK_SIZE_INPUTS - 1;
+				cma_text -= SEQ_TRANSFER;
+				read_idx_text_char = SEQ_TRANSFER - 1;
 			}
 
 		}
@@ -338,16 +440,16 @@ void umem_wfa_extend_rv(int k_min, int k_max,
 	if(read_idx_wf == loop_limit)
 	{
 		//profiling_start(&mem_write);
-		mram_write(cache_wavefront_offsets, (__mram_ptr void *) cma_wf_offsets, BLOCK_SIZE);
+		mram_write(cache_wavefront_offsets, (__mram_ptr void *) cma_wf_offsets, WF_TRANSFER);
 		//profiling_stop&mem_write);
-		cma_wf_offsets += BLOCK_SIZE;
+		cma_wf_offsets += WF_TRANSFER;
 		//profiling_start&mem_read);
-		mram_read((__mram_ptr void *) cma_wf_offsets, cache_wavefront_offsets, BLOCK_SIZE);
+		mram_read((__mram_ptr void *) cma_wf_offsets, cache_wavefront_offsets, WF_TRANSFER);
 		//profiling_stop&mem_read);
 		read_idx_wf = 0;
 	}
 		//profiling_start(&mem_write);
-		mram_write(cache_wavefront_offsets,(__mram_ptr void *) cma_wf_offsets, BLOCK_SIZE);
+		mram_write(cache_wavefront_offsets,(__mram_ptr void *) cma_wf_offsets, WF_TRANSFER);
 		//profiling_stop&mem_write);
 	//profiling_stop(&extend);
 	#if PERF_SECTIONS
@@ -375,19 +477,20 @@ ewf_offset_t umem_wfa_extend_after_compute(int32_t pattern_length, int32_t text_
 	// Iterate between k_min and k_max
 	for (k = starting_k; k <= ending_k; ++k)
 	{
+
 		// Init v and h
 		v = EWAVEFRONT_V(k, cache_wavefront_offsets[read_idx_nextwf]);
 		h = EWAVEFRONT_H(k, cache_wavefront_offsets[read_idx_nextwf]);
 
 		// Init pattern chars cache
 		cma_pattern = ma_pattern_start + v * sizeof(char);
-		mram_read_aligned(&cma_pattern, cache_pattern, &read_idx_patt_char, BLOCK_SIZE_INPUTS, 1);
-		cma_pattern += BLOCK_SIZE_INPUTS;
+		mram_read_aligned(&cma_pattern, cache_pattern, &read_idx_patt_char, SEQ_TRANSFER, 1);
+		cma_pattern += SEQ_TRANSFER;
 
 		// Init text chars cache
 		cma_text  = ma_text_start + h * sizeof(char);
-		mram_read_aligned(&cma_text, cache_text, &read_idx_text_char, BLOCK_SIZE_INPUTS, 1);
-		cma_text += BLOCK_SIZE_INPUTS;
+		mram_read_aligned(&cma_text, cache_text, &read_idx_text_char, SEQ_TRANSFER, 1);
+		cma_text += SEQ_TRANSFER;
 
 		while (v < pattern_length && h < text_length && cache_pattern[read_idx_patt_char]==cache_text[read_idx_text_char])
 		{
@@ -397,22 +500,22 @@ ewf_offset_t umem_wfa_extend_after_compute(int32_t pattern_length, int32_t text_
 			read_idx_patt_char++;
 			read_idx_text_char++;
 
-			if(read_idx_patt_char == BLOCK_SIZE_INPUTS)
+			if(read_idx_patt_char == SEQ_TRANSFER)
 			{
 				//profiling_start&mem_read);
-				mram_read((__mram_ptr void *) cma_pattern, cache_pattern, BLOCK_SIZE_INPUTS);
+				mram_read((__mram_ptr void *) cma_pattern, cache_pattern, SEQ_TRANSFER);
 				//profiling_stop&mem_read);
-				cma_pattern += BLOCK_SIZE_INPUTS;
+				cma_pattern += SEQ_TRANSFER;
 				read_idx_patt_char = 0;
 			}
 
 
-			if(read_idx_text_char == BLOCK_SIZE_INPUTS)
+			if(read_idx_text_char == SEQ_TRANSFER)
 			{
 				//profiling_start&mem_read);
-				mram_read((__mram_ptr void *) cma_text, cache_text, BLOCK_SIZE_INPUTS);
+				mram_read((__mram_ptr void *) cma_text, cache_text, SEQ_TRANSFER);
 				//profiling_stop&mem_read);
-				cma_text += BLOCK_SIZE_INPUTS;
+				cma_text += SEQ_TRANSFER;
 				read_idx_text_char = 0;
 			}
 
@@ -454,16 +557,16 @@ ewf_offset_t umem_wfa_extend_after_compute_rv(int32_t pattern_length, int32_t te
 		h = EWAVEFRONT_H(k, cache_wavefront_offsets[read_idx_nextwf]);
 
 		// Init pattern chars cache
-		cma_pattern = ma_pattern_start + ((pattern_length)-v) * sizeof(char) - BLOCK_SIZE_INPUTS;
-		mram_read_aligned_reverse(&cma_pattern, cache_pattern, &read_idx_patt_char, BLOCK_SIZE_INPUTS, 1);
-		read_idx_patt_char = BLOCK_SIZE_INPUTS -1 + read_idx_patt_char;
-		cma_pattern -= BLOCK_SIZE_INPUTS;
+		cma_pattern = ma_pattern_start + ((pattern_length)-v) * sizeof(char) - SEQ_TRANSFER;
+		mram_read_aligned_reverse(&cma_pattern, cache_pattern, &read_idx_patt_char, SEQ_TRANSFER, 1);
+		read_idx_patt_char = SEQ_TRANSFER -1 + read_idx_patt_char;
+		cma_pattern -= SEQ_TRANSFER;
 
 		// Init text chars cache
-		cma_text  = ma_text_start + ((text_length)-h) * sizeof(char) - BLOCK_SIZE_INPUTS;
-		mram_read_aligned_reverse(&cma_text, cache_text, &read_idx_text_char, BLOCK_SIZE_INPUTS, 1);
-		read_idx_text_char = BLOCK_SIZE_INPUTS -1 + read_idx_text_char;
-		cma_text -= BLOCK_SIZE_INPUTS;
+		cma_text  = ma_text_start + ((text_length)-h) * sizeof(char) - SEQ_TRANSFER;
+		mram_read_aligned_reverse(&cma_text, cache_text, &read_idx_text_char, SEQ_TRANSFER, 1);
+		read_idx_text_char = SEQ_TRANSFER -1 + read_idx_text_char;
+		cma_text -= SEQ_TRANSFER;
 
 		while (v < pattern_length && h < text_length && cache_pattern[read_idx_patt_char]==cache_text[read_idx_text_char])
 		{
@@ -476,20 +579,20 @@ ewf_offset_t umem_wfa_extend_after_compute_rv(int32_t pattern_length, int32_t te
 			if(read_idx_patt_char < 0)
 			{
 				//profiling_start&mem_read);
-				mram_read((__mram_ptr void *) cma_pattern, cache_pattern, BLOCK_SIZE_INPUTS);
+				mram_read((__mram_ptr void *) cma_pattern, cache_pattern, SEQ_TRANSFER);
 				//profiling_stop&mem_read);
-				cma_pattern -= BLOCK_SIZE_INPUTS;
-				read_idx_patt_char = BLOCK_SIZE_INPUTS - 1;
+				cma_pattern -= SEQ_TRANSFER;
+				read_idx_patt_char = SEQ_TRANSFER - 1;
 			}
 
 
 			if(read_idx_text_char < 0)
 			{
 				//profiling_start&mem_read);
-				mram_read((__mram_ptr void *) cma_text, cache_text, BLOCK_SIZE_INPUTS);
+				mram_read((__mram_ptr void *) cma_text, cache_text, SEQ_TRANSFER);
 				//profiling_stop&mem_read);
-				cma_text -= BLOCK_SIZE_INPUTS;
-				read_idx_text_char = BLOCK_SIZE_INPUTS - 1;
+				cma_text -= SEQ_TRANSFER;
+				read_idx_text_char = SEQ_TRANSFER - 1;
 			}
 
 		}
@@ -512,16 +615,16 @@ ewf_offset_t umem_wfa_compute_and_extend(int32_t lo, int32_t hi,
 	ewf_offset_t* cache_wavefront_offsets, ewf_offset_t* cache_nextwavefront_offsets,
 	int32_t pattern_length, int32_t text_length, 
 	uint32_t ma_pattern_start, uint32_t ma_text_start, 
-	char* cache_pattern, char* cache_text, dpu_results_t* result){
+	char* cache_pattern, char* cache_text, uint16_t wf_transfer_size, dpu_results_t* result){
 	//profiling_start(&compute);
 	#if PERF_SECTIONS
 	perfcounter_cycles counter;
 	timer_start(&counter);
 	#endif
 	uint16_t read_idx_wf;
-	uint16_t read_idx_nextwf, starting_idx;
+	uint16_t read_idx_nextwf, starting_idx, read_idx_nextwf2;
 	int32_t k, starting_k;
-	uint32_t cma_wf_offsets, cma_nextwf_offsets;
+	uint32_t cma_wf_offsets, cma_nextwf_offsets, cma_nextwf_offsets2;
     // Fetch wavefronts
     *nextwavefront_hi = hi + 1;
     *nextwavefront_lo = lo - 1;
@@ -534,10 +637,20 @@ ewf_offset_t umem_wfa_compute_and_extend(int32_t lo, int32_t hi,
 
     // lo
     cma_wf_offsets = (ma_wf_offsets + ((lo - 2 + max_distance) * sizeof(ewf_offset_t)));
-    mram_read_aligned(&cma_wf_offsets, cache_wavefront_offsets, &read_idx_wf, BLOCK_SIZE, TYPE_BYTES_SIZE);
+    mram_read_aligned(&cma_wf_offsets, cache_wavefront_offsets, &read_idx_wf, wf_transfer_size, TYPE_BYTES_SIZE);
 
 	cma_nextwf_offsets = (ma_wf_next_offsets + ((lo - 1 + max_distance) * sizeof(ewf_offset_t)));
-    mram_read_aligned(&cma_nextwf_offsets, cache_nextwavefront_offsets, &read_idx_nextwf, BLOCK_SIZE, TYPE_BYTES_SIZE);
+    mram_read_aligned(&cma_nextwf_offsets, cache_nextwavefront_offsets, &read_idx_nextwf, wf_transfer_size, TYPE_BYTES_SIZE);
+	// cma_nextwf_offsets2 = (ma_wf_next_offsets + ((lo - 1 + max_distance) * sizeof(ewf_offset_t)));
+	// memory_align(&cma_nextwf_offsets2, &read_idx_nextwf2, TYPE_BYTES_SIZE);
+	// // if(cma_nextwf_offsets != cma_nextwf_offsets2)printf("[DPU] memory adresses differ\n");
+	// // if(read_idx_nextwf != read_idx_nextwf2)printf("[DPU] indexes differ\n");
+	// cma_nextwf_offsets = cma_nextwf_offsets2;
+	// read_idx_nextwf = read_idx_nextwf2;
+	for(uint32_t i=0; i> loop_limit; i++){
+		cache_nextwavefront_offsets[i] = 0;
+	}
+
 	starting_idx = read_idx_nextwf;
 	// ins contains offsets[lo]
 	ins = cache_wavefront_offsets[read_idx_wf];
@@ -559,9 +672,9 @@ ewf_offset_t umem_wfa_compute_and_extend(int32_t lo, int32_t hi,
         read_idx_wf++;
         if(read_idx_wf == loop_limit)
         {
-            cma_wf_offsets += BLOCK_SIZE;
+            cma_wf_offsets += wf_transfer_size;
 			//profiling_start&mem_read);
-            mram_read((__mram_ptr void *) cma_wf_offsets, cache_wavefront_offsets, BLOCK_SIZE);
+            mram_read((__mram_ptr void *) cma_wf_offsets, cache_wavefront_offsets, wf_transfer_size);
 			//profiling_stop&mem_read);
             read_idx_wf = 0;
         }
@@ -582,11 +695,11 @@ ewf_offset_t umem_wfa_compute_and_extend(int32_t lo, int32_t hi,
 			#endif
 			max = (extend_max > max) ? extend_max : max;
 			//profiling_start(&mem_write);
-            mram_write(cache_nextwavefront_offsets, (__mram_ptr void *) cma_nextwf_offsets, BLOCK_SIZE);
+            mram_write(cache_nextwavefront_offsets, (__mram_ptr void *) cma_nextwf_offsets, wf_transfer_size);
 			//profiling_stop&mem_write);
-            cma_nextwf_offsets += BLOCK_SIZE;
+            cma_nextwf_offsets += wf_transfer_size;
 			//profiling_start&mem_read);
-            mram_read((__mram_ptr void *) cma_nextwf_offsets, cache_nextwavefront_offsets, BLOCK_SIZE);
+            mram_read((__mram_ptr void *) cma_nextwf_offsets, cache_nextwavefront_offsets, wf_transfer_size);
 			//profiling_stop&mem_read);
             read_idx_nextwf = 0;
 			starting_idx = 0;
@@ -605,7 +718,7 @@ ewf_offset_t umem_wfa_compute_and_extend(int32_t lo, int32_t hi,
 	#endif
 	max = (extend_max > max) ? extend_max : max;
 	//profiling_start(&mem_write);
-    mram_write(cache_nextwavefront_offsets, (__mram_ptr void *) cma_nextwf_offsets, BLOCK_SIZE);
+    mram_write(cache_nextwavefront_offsets, (__mram_ptr void *) cma_nextwf_offsets, wf_transfer_size);
 	//profiling_stop(&compute);
 	//profiling_stop&mem_write);
 	#if PERF_SECTIONS
@@ -621,7 +734,7 @@ ewf_offset_t umem_wfa_compute_and_extend_rv(int32_t lo, int32_t hi,
 	ewf_offset_t* cache_wavefront_offsets, ewf_offset_t* cache_nextwavefront_offsets,
 	int32_t pattern_length, int32_t text_length, 
 	uint32_t ma_pattern_start, uint32_t ma_text_start, 
-	char* cache_pattern, char* cache_text, dpu_results_t* result){
+	char* cache_pattern, char* cache_text, uint16_t wf_transfer_size, dpu_results_t* result){
 	//profiling_start(&compute);
 	#if PERF_SECTIONS
 	perfcounter_cycles counter;
@@ -642,10 +755,10 @@ ewf_offset_t umem_wfa_compute_and_extend_rv(int32_t lo, int32_t hi,
 
     // lo
     cma_wf_offsets = (ma_wf_offsets + ((lo - 2 + max_distance) * sizeof(ewf_offset_t)));
-    mram_read_aligned(&cma_wf_offsets, cache_wavefront_offsets, &read_idx_wf, BLOCK_SIZE, TYPE_BYTES_SIZE);
+    mram_read_aligned(&cma_wf_offsets, cache_wavefront_offsets, &read_idx_wf, wf_transfer_size, TYPE_BYTES_SIZE);
 
 	cma_nextwf_offsets = (ma_wf_next_offsets + ((lo - 1 + max_distance) * sizeof(ewf_offset_t)));
-    mram_read_aligned(&cma_nextwf_offsets, cache_nextwavefront_offsets, &read_idx_nextwf, BLOCK_SIZE, TYPE_BYTES_SIZE);
+    mram_read_aligned(&cma_nextwf_offsets, cache_nextwavefront_offsets, &read_idx_nextwf, wf_transfer_size, TYPE_BYTES_SIZE);
 	starting_idx = read_idx_nextwf;
 	// ins contains offsets[lo]
 	ins = cache_wavefront_offsets[read_idx_wf];
@@ -668,9 +781,9 @@ ewf_offset_t umem_wfa_compute_and_extend_rv(int32_t lo, int32_t hi,
         read_idx_wf++;
         if(read_idx_wf == loop_limit)
         {
-            cma_wf_offsets += BLOCK_SIZE;
+            cma_wf_offsets += wf_transfer_size;
 			//profiling_start&mem_read);
-            mram_read((__mram_ptr void *) cma_wf_offsets, cache_wavefront_offsets, BLOCK_SIZE);
+            mram_read((__mram_ptr void *) cma_wf_offsets, cache_wavefront_offsets, wf_transfer_size);
 			//profiling_stop&mem_read);
             read_idx_wf = 0;
         }
@@ -690,11 +803,11 @@ ewf_offset_t umem_wfa_compute_and_extend_rv(int32_t lo, int32_t hi,
 			timer_start(&counter);
 			#endif
 			//profiling_start(&mem_write);
-            mram_write(cache_nextwavefront_offsets, (__mram_ptr void *) cma_nextwf_offsets, BLOCK_SIZE);
+            mram_write(cache_nextwavefront_offsets, (__mram_ptr void *) cma_nextwf_offsets, wf_transfer_size);
 			//profiling_stop&mem_write);
-            cma_nextwf_offsets += BLOCK_SIZE;
+            cma_nextwf_offsets += wf_transfer_size;
 			//profiling_start&mem_read);
-            mram_read((__mram_ptr void *) cma_nextwf_offsets, cache_nextwavefront_offsets, BLOCK_SIZE);
+            mram_read((__mram_ptr void *) cma_nextwf_offsets, cache_nextwavefront_offsets, wf_transfer_size);
 			//profiling_stop&mem_read);
             read_idx_nextwf = 0;
 			starting_idx = 0;
@@ -712,7 +825,7 @@ ewf_offset_t umem_wfa_compute_and_extend_rv(int32_t lo, int32_t hi,
 	timer_start(&counter);
 	#endif
 	//profiling_start(&mem_write);
-    mram_write(cache_nextwavefront_offsets, (__mram_ptr void *) cma_nextwf_offsets, BLOCK_SIZE);
+    mram_write(cache_nextwavefront_offsets, (__mram_ptr void *) cma_nextwf_offsets, wf_transfer_size);
 	//profiling_stop(&compute);
 	//profiling_stop&mem_write);
 	#if PERF_SECTIONS
@@ -743,11 +856,11 @@ int check_overlap(int32_t wf_fw_lo, int32_t wf_fw_hi,
 	// printf("DPU kmin reverse %d kmax reverse %d \n", WAVEFRONT_K_INVERSE(kmin,pattern_length,text_length), WAVEFRONT_K_INVERSE(kmax,pattern_length,text_length));
 
 	cma_wf_fw = (ma_wf_fw + ((kmin + max_distance) * sizeof(ewf_offset_t)));
-	mram_read_aligned(&cma_wf_fw, cache_wf_fw, &read_idx_wf_fw, BLOCK_SIZE, TYPE_BYTES_SIZE);
+	mram_read_aligned(&cma_wf_fw, cache_wf_fw, &read_idx_wf_fw, WF_TRANSFER, TYPE_BYTES_SIZE);
 	// Reverse is read backwards to emulate the k index inversion using k inversion macro and subtracting block_size
 	// It is needed to subtract 1 size of offset since subtracting block_size will fall out of the first position we want
-	cma_wf_rv = (ma_wf_rv + ((WAVEFRONT_K_INVERSE(kmin,pattern_length,text_length) + max_distance +1) * sizeof(ewf_offset_t))- BLOCK_SIZE);
-	mram_read_aligned_reverse(&cma_wf_rv, cache_wf_rv, &read_idx_wf_rv, BLOCK_SIZE, TYPE_BYTES_SIZE);
+	cma_wf_rv = (ma_wf_rv + ((WAVEFRONT_K_INVERSE(kmin,pattern_length,text_length) + max_distance +1) * sizeof(ewf_offset_t))- WF_TRANSFER);
+	mram_read_aligned_reverse(&cma_wf_rv, cache_wf_rv, &read_idx_wf_rv, WF_TRANSFER, TYPE_BYTES_SIZE);
 	// The index will go backwards, so we start at loop ending -1 (since index ends at 0) and align it with read_idx_wf_rv
 	read_idx_wf_rv = loop_limit -1 + read_idx_wf_rv;
 
@@ -759,17 +872,17 @@ int check_overlap(int32_t wf_fw_lo, int32_t wf_fw_hi,
 
 		if(read_idx_wf_fw == loop_limit)
 		{
-			cma_wf_fw += BLOCK_SIZE;
+			cma_wf_fw += WF_TRANSFER;
 			//profiling_start&mem_read);
-			mram_read((__mram_ptr void *) cma_wf_fw, cache_wf_fw, BLOCK_SIZE);
+			mram_read((__mram_ptr void *) cma_wf_fw, cache_wf_fw, WF_TRANSFER);
 			//profiling_stop&mem_read);
 			read_idx_wf_fw = 0;
 		}
 		if(read_idx_wf_rv < 0) // less than 0 because the 0 index contains information
 		{
-			cma_wf_rv -= BLOCK_SIZE;
+			cma_wf_rv -= WF_TRANSFER;
 			//profiling_start&mem_read);
-			mram_read((__mram_ptr void *) cma_wf_rv, cache_wf_rv, BLOCK_SIZE);
+			mram_read((__mram_ptr void *) cma_wf_rv, cache_wf_rv, WF_TRANSFER);
 			//profiling_stop&mem_read);
 			read_idx_wf_rv = loop_limit-1;
 		}
@@ -807,13 +920,13 @@ inline void reset_wavefronts_upmem(uint32_t ma_wf_fw, uint32_t ma_wf_fw_next,
 		cache_wf_rv[i] = MIN_VAL;
 	} 
 
-	for(uint32_t i = 0; i < offsets_size_per_tl; i+=BLOCK_SIZE)
+	for(uint32_t i = 0; i < offsets_size_per_tl; i+=WF_TRANSFER)
 	{
 		//profiling_start(&mem_write);
-		mram_write(cache_wf_fw, (__mram_ptr void *) (ma_wf_fw      + i), BLOCK_SIZE);
-		mram_write(cache_wf_fw, (__mram_ptr void *) (ma_wf_fw_next + i), BLOCK_SIZE);
-		mram_write(cache_wf_rv, (__mram_ptr void *) (ma_wf_rv      + i), BLOCK_SIZE);
-		mram_write(cache_wf_rv, (__mram_ptr void *) (ma_wf_rv_next + i), BLOCK_SIZE);
+		mram_write(cache_wf_fw, (__mram_ptr void *) (ma_wf_fw      + i), WF_TRANSFER);
+		mram_write(cache_wf_fw, (__mram_ptr void *) (ma_wf_fw_next + i), WF_TRANSFER);
+		mram_write(cache_wf_rv, (__mram_ptr void *) (ma_wf_rv      + i), WF_TRANSFER);
+		mram_write(cache_wf_rv, (__mram_ptr void *) (ma_wf_rv_next + i), WF_TRANSFER);
 		//profiling_stop&mem_write);
 	}
 
@@ -826,12 +939,12 @@ inline void reset_wavefronts_upmem(uint32_t ma_wf_fw, uint32_t ma_wf_fw_next,
 	memory_align(&cma_wf_fw, &read_idx_wf, TYPE_BYTES_SIZE);
 	cache_wf_fw[read_idx_wf] = 0;
 	//profiling_start(&mem_write);
-	mram_write(cache_wf_fw, (__mram_ptr void *) cma_wf_fw, BLOCK_SIZE);
+	mram_write(cache_wf_fw, (__mram_ptr void *) cma_wf_fw, WF_TRANSFER);
 	//profiling_stop&mem_write);
 	memory_align(&cma_wf_rv, &read_idx_wf, TYPE_BYTES_SIZE);
 	cache_wf_rv[read_idx_wf] = 0;
 	//profiling_start(&mem_write);
-	mram_write(cache_wf_rv, (__mram_ptr void *) cma_wf_rv, BLOCK_SIZE);
+	mram_write(cache_wf_rv, (__mram_ptr void *) cma_wf_rv, WF_TRANSFER);
 	//profiling_stop&mem_write);
 }
 
@@ -900,13 +1013,13 @@ ewf_offset_t* umem_wfa_base_extend(int k_min, int k_max,
 
 		// Init pattern chars cache
 		cma_pattern = ma_pattern_start + v * sizeof(char);
-		mram_read_aligned(&cma_pattern, cache_pattern, &read_idx_patt_char, BLOCK_SIZE_INPUTS, 1);
-		cma_pattern += BLOCK_SIZE_INPUTS;
+		mram_read_aligned(&cma_pattern, cache_pattern, &read_idx_patt_char, SEQ_TRANSFER, 1);
+		cma_pattern += SEQ_TRANSFER;
 
 		// Init text chars cache
 		cma_text  = ma_text_start + h * sizeof(char);
-		mram_read_aligned(&cma_text, cache_text, &read_idx_text_char, BLOCK_SIZE_INPUTS, 1);
-		cma_text += BLOCK_SIZE_INPUTS;
+		mram_read_aligned(&cma_text, cache_text, &read_idx_text_char, SEQ_TRANSFER, 1);
+		cma_text += SEQ_TRANSFER;
 
 		while (v < pattern_length && h < text_length && cache_pattern[read_idx_patt_char]==cache_text[read_idx_text_char])
 		{
@@ -916,22 +1029,22 @@ ewf_offset_t* umem_wfa_base_extend(int k_min, int k_max,
 			read_idx_patt_char++;
 			read_idx_text_char++;
 
-			if(read_idx_patt_char == BLOCK_SIZE_INPUTS)
+			if(read_idx_patt_char == SEQ_TRANSFER)
 			{
 				//profiling_start&mem_read);
-				mram_read((__mram_ptr void *) cma_pattern, cache_pattern, BLOCK_SIZE_INPUTS);
+				mram_read((__mram_ptr void *) cma_pattern, cache_pattern, SEQ_TRANSFER);
 				//profiling_stop&mem_read);
-				cma_pattern += BLOCK_SIZE_INPUTS;
+				cma_pattern += SEQ_TRANSFER;
 				read_idx_patt_char = 0;
 			}
 
 
-			if(read_idx_text_char == BLOCK_SIZE_INPUTS)
+			if(read_idx_text_char == SEQ_TRANSFER)
 			{
 				//profiling_start&mem_read);
-				mram_read((__mram_ptr void *) cma_text, cache_text, BLOCK_SIZE_INPUTS);
+				mram_read((__mram_ptr void *) cma_text, cache_text, SEQ_TRANSFER);
 				//profiling_stop&mem_read);
-				cma_text += BLOCK_SIZE_INPUTS;
+				cma_text += SEQ_TRANSFER;
 				read_idx_text_char = 0;
 			}
 
@@ -1012,7 +1125,7 @@ void edit_wavefronts_backtrace(
 	uint64_t* cma_cigar_aux,
 	int* j){
 
-	int i = BLOCK_SIZE_INPUTS-1;
+	int i = CIGAR_TRANSFER-1;
 	int cigar_len = 0;
 	int del, sub, ins, next_target_k;
 	char operation;
@@ -1067,24 +1180,24 @@ void edit_wavefronts_backtrace(
 			cigar[i] = 'M';
 			i--;
 			if (i < 0){
-				*cma_cigar_aux -= BLOCK_SIZE_INPUTS;
+				*cma_cigar_aux -= CIGAR_TRANSFER;
 				//profiling_start(&mem_write);
-				mram_write(cigar, (__mram_ptr void *) *cma_cigar_aux, BLOCK_SIZE_INPUTS);
+				mram_write(cigar, (__mram_ptr void *) *cma_cigar_aux, CIGAR_TRANSFER);
 				//profiling_stop&mem_write);
-				cigar_len += BLOCK_SIZE_INPUTS;
-				i = BLOCK_SIZE_INPUTS-1;
+				cigar_len += CIGAR_TRANSFER;
+				i = CIGAR_TRANSFER-1;
 			}
 		}
 
 		cigar[i] = operation;
 		i--;
 		if (i < 0){
-			*cma_cigar_aux -= BLOCK_SIZE_INPUTS;
+			*cma_cigar_aux -= CIGAR_TRANSFER;
 			//profiling_start(&mem_write);
-			mram_write(cigar, (__mram_ptr void *) *cma_cigar_aux, BLOCK_SIZE_INPUTS);
+			mram_write(cigar, (__mram_ptr void *) *cma_cigar_aux, CIGAR_TRANSFER);
 			//profiling_stop&mem_write);
-			cigar_len += BLOCK_SIZE_INPUTS;
-			i = BLOCK_SIZE_INPUTS-1;
+			cigar_len += CIGAR_TRANSFER;
+			i = CIGAR_TRANSFER-1;
 		}
 		target_k = next_target_k;
 		cache_wf_curr = cache_wf_prev_curr;
@@ -1097,19 +1210,19 @@ void edit_wavefronts_backtrace(
 		i--;
 
 		if (i < 0){
-			*cma_cigar_aux -= BLOCK_SIZE_INPUTS;
+			*cma_cigar_aux -= CIGAR_TRANSFER;
 			//profiling_start(&mem_write);
-			mram_write(cigar, (__mram_ptr void *) *cma_cigar_aux, BLOCK_SIZE_INPUTS);
+			mram_write(cigar, (__mram_ptr void *) *cma_cigar_aux, CIGAR_TRANSFER);
 			//profiling_stop&mem_write);
-			cigar_len += BLOCK_SIZE_INPUTS;
-			i = BLOCK_SIZE_INPUTS-1;
+			cigar_len += CIGAR_TRANSFER;
+			i = CIGAR_TRANSFER-1;
 		}
 	}
 	i++;
-	cigar_len += BLOCK_SIZE_INPUTS -i;
-	if(i== BLOCK_SIZE_INPUTS){
+	cigar_len += CIGAR_TRANSFER -i;
+	if(i== CIGAR_TRANSFER){
 		i = 0;
-		*cma_cigar_aux += BLOCK_SIZE_INPUTS;
+		*cma_cigar_aux += CIGAR_TRANSFER;
 	}
 
 	while (cigar_len > 0)
@@ -1117,20 +1230,20 @@ void edit_wavefronts_backtrace(
 		cache_cigar_aux[(*j)] = cigar[i];
 		(*j)++;
 		i++;
-		if ((*j)>=BLOCK_SIZE_INPUTS)
+		if ((*j)>=CIGAR_TRANSFER)
 		{
 			//profiling_start(&mem_write);
-			mram_write(cache_cigar_aux, (__mram_ptr void *) *cma_cigar, BLOCK_SIZE_INPUTS);
+			mram_write(cache_cigar_aux, (__mram_ptr void *) *cma_cigar, CIGAR_TRANSFER);
 			//profiling_stop&mem_write);
 			(*j)=0;
-			*cma_cigar += BLOCK_SIZE_INPUTS;
+			*cma_cigar += CIGAR_TRANSFER;
 		}
-		if (i>=BLOCK_SIZE_INPUTS)
+		if (i>=CIGAR_TRANSFER)
 		{
 			//profiling_start(&mem_write);
-			mram_read((__mram_ptr void *) *cma_cigar_aux, cigar, BLOCK_SIZE_INPUTS);
+			mram_read((__mram_ptr void *) *cma_cigar_aux, cigar, CIGAR_TRANSFER);
 			//profiling_stop&mem_write);
-			*cma_cigar_aux += BLOCK_SIZE_INPUTS;
+			*cma_cigar_aux += CIGAR_TRANSFER;
 			i=0;
 		}
 		cigar_len--;
@@ -1175,7 +1288,7 @@ int base_wavefront(uint32_t ma_pattern_start, uint32_t ma_text_start,
 
 	if (pattern_length == 0 && text_length == 0) return distance; 
 
-	for(uint16_t i = 1; i < BLOCK_SIZE; i++){
+	for(uint16_t i = 1; i < WF_TRANSFER; i++){
 		cache_wf[i] = MIN_VAL;
 	}
 	cache_wf[0] = 0;
@@ -1253,7 +1366,7 @@ void wfa_adaptive(int32_t* wf_lo, int32_t* wf_hi, int32_t ma_wf, ewf_offset_t* c
     int khi = *wf_hi;
 
 	cma_wf_offsets = (ma_wf + ((klo + max_distance) * sizeof(ewf_offset_t)));
-    mram_read_aligned(&cma_wf_offsets, cache_wf, &read_idx_wf, BLOCK_SIZE, TYPE_BYTES_SIZE);
+    mram_read_aligned(&cma_wf_offsets, cache_wf, &read_idx_wf, WF_TRANSFER, TYPE_BYTES_SIZE);
 
     for (int k = klo; k <= khi; ++k)
     {
@@ -1268,8 +1381,8 @@ void wfa_adaptive(int32_t* wf_lo, int32_t* wf_hi, int32_t ma_wf, ewf_offset_t* c
 		read_idx_wf++;
         if(read_idx_wf == loop_limit)
         {			
-            cma_wf_offsets += BLOCK_SIZE;
-            mram_read((__mram_ptr void *) cma_wf_offsets, cache_wf, BLOCK_SIZE);
+            cma_wf_offsets += WF_TRANSFER;
+            mram_read((__mram_ptr void *) cma_wf_offsets, cache_wf, WF_TRANSFER);
             read_idx_wf = 0;
         }
     }
@@ -1279,7 +1392,7 @@ void wfa_adaptive(int32_t* wf_lo, int32_t* wf_hi, int32_t ma_wf, ewf_offset_t* c
     int top_limit = MIN(alignment_k - 1, khi);
 
 	cma_wf_offsets = (ma_wf + ((klo + max_distance) * sizeof(ewf_offset_t)));
-    mram_read_aligned(&cma_wf_offsets, cache_wf, &read_idx_wf, BLOCK_SIZE, TYPE_BYTES_SIZE);
+    mram_read_aligned(&cma_wf_offsets, cache_wf, &read_idx_wf, WF_TRANSFER, TYPE_BYTES_SIZE);
 
     for (int k = *wf_lo; k < top_limit; ++k)
     {
@@ -1289,15 +1402,15 @@ void wfa_adaptive(int32_t* wf_lo, int32_t* wf_hi, int32_t ma_wf, ewf_offset_t* c
         int left_v = pattern_length - v;
         int left_h = text_length - h;
         int distance = MAX(left_v, left_h);
-        if ((distance - min_distance) <= MAX_DISTANCE_THRESHOLD)
+        if ((distance - min_distance) <= MAX_DISTANCE_ADAPTIVE)
             break;
         *wf_lo = *wf_lo + 1;
 
 		read_idx_wf++;
         if(read_idx_wf == loop_limit)
         {			
-            cma_wf_offsets += BLOCK_SIZE;
-            mram_read((__mram_ptr void *) cma_wf_offsets, cache_wf, BLOCK_SIZE);
+            cma_wf_offsets += WF_TRANSFER;
+            mram_read((__mram_ptr void *) cma_wf_offsets, cache_wf, WF_TRANSFER);
             read_idx_wf = 0;
         }
     }
@@ -1305,8 +1418,8 @@ void wfa_adaptive(int32_t* wf_lo, int32_t* wf_hi, int32_t ma_wf, ewf_offset_t* c
     // //reduce from top
     int bottom_limit = MAX(alignment_k + 1, *wf_lo);
 
-	cma_wf_offsets = (ma_wf - BLOCK_SIZE + ((khi + max_distance) * sizeof(ewf_offset_t)));
-    mram_read_aligned_reverse(&cma_wf_offsets, cache_wf, &read_idx_wf_rv, BLOCK_SIZE, TYPE_BYTES_SIZE);
+	cma_wf_offsets = (ma_wf - WF_TRANSFER + ((khi + max_distance) * sizeof(ewf_offset_t)));
+    mram_read_aligned_reverse(&cma_wf_offsets, cache_wf, &read_idx_wf_rv, WF_TRANSFER, TYPE_BYTES_SIZE);
 	read_idx_wf_rv = loop_limit -1 + read_idx_wf_rv;
 
     for (int k = khi; k > bottom_limit; --k)
@@ -1318,15 +1431,15 @@ void wfa_adaptive(int32_t* wf_lo, int32_t* wf_hi, int32_t ma_wf, ewf_offset_t* c
         int left_h = text_length - h;
         int distance = MAX(left_v, left_h);
 
-        if (distance - min_distance <= MAX_DISTANCE_THRESHOLD)
+        if (distance - min_distance <= MAX_DISTANCE_ADAPTIVE)
             break;
         *wf_hi = *wf_hi - 1;
 
 		read_idx_wf_rv--;
         if(read_idx_wf_rv < 0)
         {			
-            cma_wf_offsets -= BLOCK_SIZE;
-            mram_read((__mram_ptr void *) cma_wf_offsets, cache_wf, BLOCK_SIZE);
+            cma_wf_offsets -= WF_TRANSFER;
+            mram_read((__mram_ptr void *) cma_wf_offsets, cache_wf, WF_TRANSFER);
             read_idx_wf_rv = loop_limit-1;
         }
     }
@@ -1376,6 +1489,8 @@ int find_breakpoint_iterative(int32_t pattern_length, int32_t text_length,
 	int32_t wf_rv_hi = 0;
 	int32_t wf_rv_next_lo = 0;
 	int32_t wf_rv_next_hi = 0;
+	uint16_t wffw_transfer_size = 8;
+	uint16_t wfrv_transfer_size = 8;
 	#if PERF_SECTIONS
 	perfcounter_cycles counter;
 	#endif
@@ -1432,13 +1547,13 @@ int find_breakpoint_iterative(int32_t pattern_length, int32_t text_length,
 		{
 			cache_cigar_aux[(*cigar_aux_pos)] = 'M';
 			(*cigar_aux_pos)++;
-			if ((*cigar_aux_pos)>=BLOCK_SIZE_INPUTS)
+			if ((*cigar_aux_pos)>=CIGAR_TRANSFER)
 			{
 				//profiling_start(&mem_write);
-				mram_write(cache_cigar_aux, (__mram_ptr void *) *cma_cigar, BLOCK_SIZE_INPUTS);
+				mram_write(cache_cigar_aux, (__mram_ptr void *) *cma_cigar, CIGAR_TRANSFER);
 				//profiling_stop&mem_write);
 				(*cigar_aux_pos)=0;
-				*cma_cigar += BLOCK_SIZE_INPUTS;
+				*cma_cigar += CIGAR_TRANSFER;
 			}
 			cigar_len--;
 			
@@ -1457,10 +1572,18 @@ int find_breakpoint_iterative(int32_t pattern_length, int32_t text_length,
 		#endif
 		// compute and extend forward
 		distance_fw++;
-		if(distance_fw >= max_distance){
+		if(distance_fw >= MAX_DISTANCE_THRESHOLD){
+			#if PRINT
 			printf("[DPU] distance exceeded %d limit %d plen %d tlen %d\n", distance_fw, max_distance, pattern_length, text_length);
+			#endif
 			return -1;
 		}
+
+		if((((wf_fw_hi+1) - (wf_fw_lo-1)) + 1)*4 > wffw_transfer_size && wffw_transfer_size < WF_TRANSFER){
+			wffw_transfer_size = wffw_transfer_size << 1;
+			//wffw_transfer_size += 16;
+		}
+		//wffw_transfer_size = WF_TRANSFER;
 		max_fw = umem_wfa_compute_and_extend(wf_fw_lo, wf_fw_hi,
 				&wf_fw_next_lo, &wf_fw_next_hi, 
 				loop_limit, max_distance, 
@@ -1468,7 +1591,7 @@ int find_breakpoint_iterative(int32_t pattern_length, int32_t text_length,
 				cache_wf_fw, cache_wf_fw_next,
 				pattern_length, text_length, 
 				ma_pattern_start, ma_text_start, 
-				cache_pattern, cache_text, result);
+				cache_pattern, cache_text, wffw_transfer_size, result);
 		#if PERF_MAIN
 		result->main += timer_stop(main_counter);
 		timer_start(main_counter);
@@ -1517,9 +1640,9 @@ int find_breakpoint_iterative(int32_t pattern_length, int32_t text_length,
 
 				if (*task_idx >= task_limit){
 					//profiling_start(&mem_write);
-					mram_write(cache_tasks, (__mram_ptr void *) *cma_tasks, BLOCK_SIZE);
+					mram_write(cache_tasks, (__mram_ptr void *) *cma_tasks, TASK_TRANSFER);
 					//profiling_stop&mem_write);
-					*cma_tasks += BLOCK_SIZE;
+					*cma_tasks += TASK_TRANSFER;
 					*task_idx = 0;
 				}
 				cache_tasks[*task_idx] = pair_metadata;
@@ -1538,9 +1661,9 @@ int find_breakpoint_iterative(int32_t pattern_length, int32_t text_length,
 
 				if (*task_idx >= task_limit){
 					//profiling_start(&mem_write);
-					mram_write(cache_tasks, (__mram_ptr void *) *cma_tasks, BLOCK_SIZE);
+					mram_write(cache_tasks, (__mram_ptr void *) *cma_tasks, TASK_TRANSFER);
 					//profiling_stop&mem_write);
-					*cma_tasks += BLOCK_SIZE;
+					*cma_tasks += TASK_TRANSFER;
 					*task_idx = 0;
 				}
 				cache_tasks[*task_idx] = pair_metadata;
@@ -1593,10 +1716,19 @@ int find_breakpoint_iterative(int32_t pattern_length, int32_t text_length,
 			pattern_length, text_length, max_distance, loop_limit);
 		#endif
 		distance_rv++;
-		if(distance_rv >= max_distance){				
+		if(distance_rv >= MAX_DISTANCE_THRESHOLD){			
+			#if PRINT	
 			printf("[DPU] distance exceeded %d limit %d plen %d tlen %d\n", distance_rv, max_distance, pattern_length, text_length);
+			#endif
 			return -1;
 		}
+		
+		if((((wf_fw_hi+1) - (wf_fw_lo-1)) + 1)*4 > wfrv_transfer_size && wfrv_transfer_size < WF_TRANSFER){
+			wfrv_transfer_size = wfrv_transfer_size << 1;
+			//wfrv_transfer_size += 16;
+		}
+		//wfrv_transfer_size = WF_TRANSFER;
+
 		// compute and extend reverse
 		max_rv = umem_wfa_compute_and_extend_rv(wf_rv_lo, wf_rv_hi,
 				&wf_rv_next_lo, &wf_rv_next_hi, 
@@ -1605,7 +1737,7 @@ int find_breakpoint_iterative(int32_t pattern_length, int32_t text_length,
 				cache_wf_rv, cache_wf_rv_next,
 				pattern_length, text_length, 
 				ma_pattern_start, ma_text_start, 
-				cache_pattern, cache_text, result);
+				cache_pattern, cache_text, wfrv_transfer_size, result);
 		#if PERF_MAIN
 		result->main += timer_stop(main_counter);
 		timer_start(main_counter);
@@ -1657,9 +1789,9 @@ int find_breakpoint_iterative(int32_t pattern_length, int32_t text_length,
 
 				if (*task_idx >= task_limit){
 					//profiling_start(&mem_write);
-					mram_write(cache_tasks, (__mram_ptr void *) *cma_tasks, BLOCK_SIZE);
+					mram_write(cache_tasks, (__mram_ptr void *) *cma_tasks, TASK_TRANSFER);
 					//profiling_stop&mem_write);
-					*cma_tasks += BLOCK_SIZE;
+					*cma_tasks += TASK_TRANSFER;
 					*task_idx = 0;
 				}
 				cache_tasks[*task_idx] = pair_metadata;
@@ -1678,9 +1810,9 @@ int find_breakpoint_iterative(int32_t pattern_length, int32_t text_length,
 
 				if (*task_idx >= task_limit){
 					//profiling_start(&mem_write);
-					mram_write(cache_tasks, (__mram_ptr void *) *cma_tasks, BLOCK_SIZE);
+					mram_write(cache_tasks, (__mram_ptr void *) *cma_tasks, TASK_TRANSFER);
 					//profiling_stop&mem_write);
-					*cma_tasks += BLOCK_SIZE;
+					*cma_tasks += TASK_TRANSFER;
 					*task_idx = 0;
 				}
 				cache_tasks[*task_idx] = pair_metadata;

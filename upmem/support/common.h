@@ -2,20 +2,44 @@
 #define _COMMON_H_
 
 // Transfer size between MRAM and WRAM
-#ifdef BL
-#define BLOCK_SIZE_LOG2 BL
-#define BLOCK_SIZE (1 << BLOCK_SIZE_LOG2)
+#ifdef WFT
+#define WF_TRANSFER_LOG2 WFT
+#define WF_TRANSFER (1 << WF_TRANSFER_LOG2)
 #else
-#define BLOCK_SIZE_LOG2 10
-#define BLOCK_SIZE (1 << BLOCK_SIZE_LOG2)
+#define WF_TRANSFER_LOG2 9
+#define WF_TRANSFER (1 << WF_TRANSFER_LOG2)
 #endif
 
-#ifdef BLI
-#define BLOCK_SIZE_INPUTS_LOG2 BLI
-#define BLOCK_SIZE_INPUTS (1 << BLOCK_SIZE_INPUTS_LOG2)
+#ifdef TASKT
+#define TASK_TRANSFER_LOG2 TASKT
+#define TASK_TRANSFER (1 << TASK_TRANSFER_LOG2)
 #else
-#define BLOCK_SIZE_INPUTS_LOG2 3
-#define BLOCK_SIZE_INPUTS (1 << BLOCK_SIZE_INPUTS_LOG2)
+#define TASK_TRANSFER_LOG2 3
+#define TASK_TRANSFER (1 << TASK_TRANSFER_LOG2)
+#endif
+
+#ifdef LENT
+#define LEN_TRANSFER_LOG2 LENT
+#define LEN_TRANSFER (1 << LEN_TRANSFER_LOG2)
+#else
+#define LEN_TRANSFER_LOG2 3
+#define LEN_TRANSFER (1 << LEN_TRANSFER_LOG2)
+#endif
+
+#ifdef CIGART
+#define CIGAR_TRANSFER_LOG2 CIGART
+#define CIGAR_TRANSFER (1 << CIGAR_TRANSFER_LOG2)
+#else
+#define CIGAR_TRANSFER_LOG2 3
+#define CIGAR_TRANSFER (1 << CIGAR_TRANSFER_LOG2)
+#endif
+
+#ifdef SEQT
+#define SEQ_TRANSFER_LOG2 SEQT
+#define SEQ_TRANSFER (1 << SEQ_TRANSFER_LOG2)
+#else
+#define SEQ_TRANSFER_LOG2 3
+#define SEQ_TRANSFER (1 << SEQ_TRANSFER_LOG2)
 #endif
 
 #define MAX_ERRORS 1048576
@@ -54,6 +78,8 @@ typedef int32_t ewf_offset_t;  // Edit Wavefront Offset
 typedef struct  {
     uint32_t longest_seq;
     uint32_t num_pairs_per_dpu;
+    uint32_t batch_pairs_per_dpu;
+    uint32_t batch_idx;
     ewf_offset_t threshold;
     enum kernels {
 		kernel1 = 0,
@@ -132,8 +158,10 @@ typedef struct {
 #define WAVEFRONT_BAND 30
 #define BASE_BAND 10
 #define MIN_WFA_LEN 10
-#define MAX_DISTANCE_THRESHOLD 50
+#define MAX_DISTANCE_ADAPTIVE 50
+#define MAX_DISTANCE_THRESHOLD 100
 #define MAX_ERROR 0.20
+#define BATCH_SIZE 0
 
 #define ANSI_COLOR_RED     "\x1b[31m"
 #define ANSI_COLOR_GREEN   "\x1b[32m"

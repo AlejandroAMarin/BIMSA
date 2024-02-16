@@ -255,7 +255,7 @@ void run_set(char* patterns, char* texts,
 		printf("[INFO] " ANSI_COLOR_BLUE "num_pairs: \t %ld" ANSI_COLOR_RESET "\n", num_pairs);
 		printf("[INFO] " ANSI_COLOR_BLUE "longest_sequence: %ld" ANSI_COLOR_RESET "\n", longest_seq);
 		printf("[INFO] Pairs per DPU (adjusted): (%ld)\n", num_pairs_per_dpu);
-		printf("[INFO] Total WRAM usage: (%d) bytes \n", NR_TASKLETS * (BLOCK_SIZE*5 + BLOCK_SIZE_INPUTS*6 + 8 + STACK_SIZE_DEFAULT));
+		printf("[INFO] Total WRAM usage: (%f) bytes \n", ((float)NR_TASKLETS * (WF_TRANSFER*4 + SEQ_TRANSFER*2 + CIGAR_TRANSFER*2 + LEN_TRANSFER*2 + TASK_TRANSFER + 8 + STACK_SIZE_DEFAULT)/(float)WRAM_LIMIT)*100);
 		printf("[INFO] Reading input... "ANSI_COLOR_GREEN "OK" ANSI_COLOR_RESET".\n");
 		printf("[INFO] Allocating DPUs... ");
 		fflush(stdout);
@@ -279,7 +279,7 @@ void run_set(char* patterns, char* texts,
 		}
 
 		i = 0;
-		*mem_offset = BLOCK_SIZE_INPUTS; // offset points to first MRAM address
+		*mem_offset = SEQ_TRANSFER; // offset points to first MRAM address
 		// printf("[VERBOSE] HOST ma pattern %d\n", mem_offset[set]);
 		// Patterns transfer
 		DPU_FOREACH(*dpu_set, dpu, i)
@@ -626,11 +626,11 @@ int main(int argc, char **argv){
 
     return 0;
 	}
-	ewf_offset_t threshold = (ewf_offset_t)sqrt(3*BLOCK_SIZE);
+	ewf_offset_t threshold = (ewf_offset_t)sqrt(3*WF_TRANSFER);
 	printf("[INFO] Threshold %d\n",threshold);
 	bool file_status;
 	printf("[INFO] sets %d\n",p.sets[0]);
-	if(NR_TASKLETS * (BLOCK_SIZE*5 + BLOCK_SIZE_INPUTS*6 + 8 + STACK_SIZE_DEFAULT) > WRAM_LIMIT){
+	if(NR_TASKLETS * (WF_TRANSFER*4 + SEQ_TRANSFER*2 + CIGAR_TRANSFER*2 + LEN_TRANSFER*2 + TASK_TRANSFER + 8 + STACK_SIZE_DEFAULT) > WRAM_LIMIT){
 		printf("[ERROR] Exceeded WRAM capacity, reconfigure BL/BLI/NR_TASKLETS");
 		return 0;
 	}
@@ -776,16 +776,16 @@ int main(int argc, char **argv){
 		// printf("[VERBOSE] num pairs alloc %ld vs num pairs %ld\n", num_pairs_alloc[set], num_pairs[set]);
 
 		cigar_length[set] = 2 * longest_seq[set];
-		cigar_length_adjustment = cigar_length[set] % BLOCK_SIZE_INPUTS;
-		if(cigar_length_adjustment != 0) cigar_length[set] += (BLOCK_SIZE_INPUTS - cigar_length_adjustment);
+		cigar_length_adjustment = cigar_length[set] % CIGAR_TRANSFER;
+		if(cigar_length_adjustment != 0) cigar_length[set] += (CIGAR_TRANSFER - cigar_length_adjustment);
 		// printf("[VERBOSE] CIGAR length %ld\n", cigar_length[set]);
 
 		offsets_size_per_tl[set] = 4*longest_seq[set]* MAX_ERROR * sizeof(ewf_offset_t);
-		offsets_size_adjustement = offsets_size_per_tl[set] % BLOCK_SIZE;
-		if(offsets_size_adjustement != 0) offsets_size_per_tl[set] += (BLOCK_SIZE - offsets_size_adjustement);
+		offsets_size_adjustement = offsets_size_per_tl[set] % WF_TRANSFER;
+		if(offsets_size_adjustement != 0) offsets_size_per_tl[set] += (WF_TRANSFER - offsets_size_adjustement);
 		// printf("[VERBOSE] offset_size length %d\n", offsets_size_per_tl[set]);
 
-		mram_usage[set] = BLOCK_SIZE_INPUTS // starting offset
+		mram_usage[set] = SEQ_TRANSFER // starting offset
 		+ 2 * (longest_seq[set] * num_pairs_per_dpu[set] * sizeof(char)) // patterns and texts
 		+ 2 * (num_pairs_per_dpu[set] * sizeof(uint32_t)) // pattern and text lengths
 		+ NR_TASKLETS * (4 * offsets_size_per_tl[set]) // wavefronts
@@ -799,7 +799,7 @@ int main(int argc, char **argv){
 		while (mram_usage[set] > MRAM_LIMIT)
 		{
 			set_partitions[set]++;
-			mram_usage[set] = BLOCK_SIZE_INPUTS // starting offset
+			mram_usage[set] = SEQ_TRANSFER // starting offset
 			+ 2 * (longest_seq[set] * (num_pairs_per_dpu[set] / set_partitions[set])  * sizeof(char)) // patterns and texts
 			+ 2 * ((num_pairs_per_dpu[set] / set_partitions[set]) * sizeof(uint32_t)) // pattern and text lengths
 			+ NR_TASKLETS * (4 * offsets_size_per_tl[set]) // wavefronts
