@@ -339,7 +339,7 @@ int main_kernel1() {
 		// ma_results += 8;
 		// Write back te results to HOST
 		cache_distances[read_idx_distances] = distance;
-		//printf("[DPU] TL %d pair %d distance = %d\n", me(), pair, distance);
+		//if(batch_idx == 4)printf("[DPU] TL %d pair %d distance = %d\n", me(), pair, distance);
 		read_idx_distances++;
 		if(read_idx_distances == 2) // Min numpairs per tasklet to compute
 		{

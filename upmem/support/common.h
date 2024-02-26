@@ -159,9 +159,9 @@ typedef struct {
 #define BASE_BAND 10
 #define MIN_WFA_LEN 10
 #define MAX_DISTANCE_ADAPTIVE 50
-#define MAX_DISTANCE_THRESHOLD 100
+#define MAX_DISTANCE_THRESHOLD 50
 #define MAX_ERROR 0.20
-#define BATCH_SIZE 0
+#define BATCH_SIZE 200000
 
 #define ANSI_COLOR_RED     "\x1b[31m"
 #define ANSI_COLOR_GREEN   "\x1b[32m"
