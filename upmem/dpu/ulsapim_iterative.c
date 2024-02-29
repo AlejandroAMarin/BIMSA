@@ -149,6 +149,7 @@ int main_kernel1() {
 	const uint32_t wf_limit              = WF_TRANSFER / sizeof(ewf_offset_t);
 	const int32_t task_limit             = TASK_TRANSFER / sizeof(pair_meta_t);
 	const uint32_t num_ints_inputs_block = LEN_TRANSFER / sizeof(int32_t);
+	const uint32_t base_limit 			 = (4*WF_TRANSFER)/sizeof(uint32_t);
 
 #if PRINT
  	if(tasklet_id == 0)
@@ -261,7 +262,7 @@ int main_kernel1() {
 					ma_wf_fw, ma_wf_fw_next, 
 					ma_wf_rv, ma_wf_rv_next,
 					ma_pattern_start, ma_text_start,
-					wf_limit, offsets_size_per_tl, threshold,
+					wf_limit, base_limit, offsets_size_per_tl, threshold,
 					&cma_cigar, cache_cigar, cache_cigar_aux,
 					&cma_cigar_aux, &cigar_aux_pos, cache_tasks, &task_idx, &cma_tasks,
 					task_limit, max_distance, result, &counter
@@ -304,7 +305,7 @@ int main_kernel1() {
 								ma_wf_fw, ma_wf_fw_next, 
 								ma_wf_rv, ma_wf_rv_next,
 								ma_pattern_start, ma_text_start,
-								wf_limit, offsets_size_per_tl, threshold,
+								wf_limit, base_limit, offsets_size_per_tl, threshold,
 								&cma_cigar, cache_cigar, cache_cigar_aux,
 								&cma_cigar_aux, &cigar_aux_pos, cache_tasks, &task_idx, &cma_tasks,
 								task_limit, max_distance, result, &counter

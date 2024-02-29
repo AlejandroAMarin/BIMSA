@@ -1263,7 +1263,7 @@ int base_wavefront(uint32_t ma_pattern_start, uint32_t ma_text_start,
 		const int text_length,
 		const ewf_offset_t threshold, uint64_t* cma_cigar, char* cache_cigar, char* cache_cigar_aux,
 		uint64_t* cma_cigar_aux,
-		int* cigar_aux_pos, dpu_results_t* result
+		int* cigar_aux_pos, const uint32_t base_limit, dpu_results_t* result
 		){
 	//profiling_start(&base_case);
 	#if PERF_SECTIONS
@@ -1288,7 +1288,7 @@ int base_wavefront(uint32_t ma_pattern_start, uint32_t ma_text_start,
 
 	if (pattern_length == 0 && text_length == 0) return distance; 
 
-	for(uint16_t i = 1; i < WF_TRANSFER; i++){
+	for(uint16_t i = 1; i < base_limit; i++){
 		cache_wf[i] = MIN_VAL;
 	}
 	cache_wf[0] = 0;
@@ -1460,7 +1460,7 @@ int find_breakpoint_iterative(int32_t pattern_length, int32_t text_length,
 						uint32_t ma_wf_fw, uint32_t ma_wf_fw_next, 
 						uint32_t ma_wf_rv, uint32_t ma_wf_rv_next,
 						uint32_t ma_pattern_start, uint32_t ma_text_start,
-						uint32_t loop_limit, uint32_t offsets_size_per_tl, const ewf_offset_t threshold,
+						const uint32_t loop_limit, const uint32_t base_limit, uint32_t offsets_size_per_tl, const ewf_offset_t threshold,
 						uint64_t* cma_cigar, char* cache_cigar, 
 						char* cache_cigar_aux,
 						uint64_t* cma_cigar_aux, int* cigar_aux_pos,
@@ -1626,7 +1626,7 @@ int find_breakpoint_iterative(int32_t pattern_length, int32_t text_length,
 			#endif
 		}
 		if(overlap) {
-			if(distance_fw + distance_rv > threshold){
+			if(distance_fw + distance_rv + 2 >= threshold){
 				//Write 2 tasks meta data
 				// task right
 				pair_metadata.p_len = pattern_length - EWAVEFRONT_V(k,offset); //pattern_length;
@@ -1682,7 +1682,7 @@ int find_breakpoint_iterative(int32_t pattern_length, int32_t text_length,
 										EWAVEFRONT_H(k,offset),
 										threshold, cma_cigar, cache_cigar, 
 										cache_cigar_aux,
-										cma_cigar_aux, cigar_aux_pos, result);
+										cma_cigar_aux, cigar_aux_pos, base_limit, result);
 				#if PERF_MAIN
 				result->main += timer_stop(main_counter);
 				timer_start(main_counter);
@@ -1700,7 +1700,7 @@ int find_breakpoint_iterative(int32_t pattern_length, int32_t text_length,
 										text_length - EWAVEFRONT_H(k,offset),
 										threshold, cma_cigar, cache_cigar, 
 										cache_cigar_aux,
-										cma_cigar_aux, cigar_aux_pos, result);
+										cma_cigar_aux, cigar_aux_pos, base_limit, result);
 				#if PERF_MAIN
 				result->main += timer_stop(main_counter);
 				timer_start(main_counter);
@@ -1775,7 +1775,7 @@ int find_breakpoint_iterative(int32_t pattern_length, int32_t text_length,
 
 		if(overlap) {
 			
-			if(distance_fw + distance_rv > threshold){
+			if(distance_fw + distance_rv + 2 >= threshold){
 				//Write 2 tasks meta data
 				// task right
 				pair_metadata.p_len = pattern_length - EWAVEFRONT_V(k,offset); // pattern_length;
@@ -1831,7 +1831,7 @@ int find_breakpoint_iterative(int32_t pattern_length, int32_t text_length,
 										EWAVEFRONT_H(k,offset),
 										threshold, cma_cigar, cache_cigar, 
 										cache_cigar_aux,
-										cma_cigar_aux, cigar_aux_pos, result);
+										cma_cigar_aux, cigar_aux_pos, base_limit, result);
 				#if PERF_MAIN
 				result->main += timer_stop(main_counter);
 				timer_start(main_counter);
@@ -1849,7 +1849,7 @@ int find_breakpoint_iterative(int32_t pattern_length, int32_t text_length,
 										text_length - EWAVEFRONT_H(k,offset),
 										threshold, cma_cigar, cache_cigar, 
 										cache_cigar_aux,
-										cma_cigar_aux, cigar_aux_pos, result);
+										cma_cigar_aux, cigar_aux_pos, base_limit, result);
 				#if PERF_MAIN
 				result->main += timer_stop(main_counter);
 				timer_start(main_counter);
