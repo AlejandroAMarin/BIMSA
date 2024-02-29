@@ -38,7 +38,7 @@ void usage() {
     p.n_reps        = 1;
     p.max_pairs     = UINT32_MAX;
     //p.max_pairs = 70;
-    //p.max_pairs     = 50000;
+    //p.max_pairs     = 2500;
     p.num_sets = 1;
     p.sets = (int*)realloc(p.sets, p.num_sets * sizeof(int));
     p.sets[0] = 18319;

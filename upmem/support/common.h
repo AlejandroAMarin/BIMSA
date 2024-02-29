@@ -161,7 +161,7 @@ typedef struct {
 #define MAX_DISTANCE_ADAPTIVE 50
 #define MAX_DISTANCE_THRESHOLD 50
 #define MAX_ERROR 0.20
-#define BATCH_SIZE 500000
+#define BATCH_SIZE 0
 
 #define ANSI_COLOR_RED     "\x1b[31m"
 #define ANSI_COLOR_GREEN   "\x1b[32m"
