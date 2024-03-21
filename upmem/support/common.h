@@ -154,7 +154,7 @@ typedef struct {
 #define ENERGY 0
 #endif
 #define PRINT 0
-#define DEBUG 0
+#define DEBUG 1
 #define WAVEFRONT_BAND 30
 #define BASE_BAND 10
 #define MIN_WFA_LEN 10

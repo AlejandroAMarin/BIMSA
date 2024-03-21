@@ -32,16 +32,16 @@ void usage() {
   struct Params input_params(int argc, char **argv) {
     struct Params p;
     p.input_file    =  malloc(1024 * sizeof(char));
-    p.input_file    =  "/home/upmem0046/aalonso/inputs/PacBio.HF.1M.seq";
+    p.input_file    =  "/home/upmem0046/aalonso/inputs/PacBio.CSS.1M.seq";
     //p.input_file    =  "UNSET";
     p.n_warmup      = 0;
     p.n_reps        = 1;
     p.max_pairs     = UINT32_MAX;
-    //p.max_pairs = 70;
+    //p.max_pairs = 2500;
     //p.max_pairs     = 2500;
     p.num_sets = 1;
     p.sets = (int*)realloc(p.sets, p.num_sets * sizeof(int));
-    p.sets[0] = 25000;
+    p.sets[0] = 18319;
     // p.sets[1] = 10000;
     // p.sets[2] = 12000;
     // p.sets[3] = 18318;
