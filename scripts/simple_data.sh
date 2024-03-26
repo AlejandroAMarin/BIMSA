@@ -1,24 +1,17 @@
 #!/bin/bash
 
-NR_DPUS=1000
-BL=8
-BLI=5
-SZ=1024
-NR_SEQ=5000000
-NR_TASKLETS=24
-EXP_FILE="/home/upmem0046/aalonso/experiments/scalability/biwfa-iterative.out"
+NR_DPUS=2500
+NR_TASKLETS=12
+EXP_FILE="/home/upmem0046/aalonso/experiments/scalability/BIMSA-$1-$NR_DPUS.out"
 
 echo "\n" >  $EXP_FILE
-for seqlen in 150 1000
+for i in 1 2 3 4
 do
-    for error in 2 5 10
-    do
-    cd	/home/upmem0046/aalonso/wfa-upmem/upmem/bi_wfa
+    cd	/home/upmem0046/aalonso/ulsapim-github/ULSAPIM/upmem/
         make clean
-        make NR_TASKLETS="$NR_TASKLETS" NR_DPUS="$NR_DPUS" BL="$BL" BLI="$BLI" STACK_SIZE_DEFAULT="$SZ"
-    echo "\n Running experiment for NR_TASKLETS=$NR_TASKLETS NR_DPUS=$NR_DPUS BL=$BL BLI=$BLI STACK_SIZE_DEFAULT=$SZ seqlen=$seqlen error=$error \n" >> $EXP_FILE
-        ./bin/biwfa_host -i /home/upmem0046/aalonso/inputs/n"$NR_SEQ"_l"$seqlen"_e"$error".seq >> $EXP_FILE
-    #cd /home/upmem0046/aalonso/WFA2-lib
-        #./bin/align_benchmark -a edit-wfa --num-threads 32 --wfa-memory-mode ultralow -i /home/upmem0046/aalonso/inputs/n"$NR_SEQ"_l"$seqlen"_e"$error".seq -o cpu_output 2>>  /home/upmem0046/aalonso/simple_test.out
-    done
+        make NR_TASKLETS=$NR_TASKLETS NR_DPUS=$NR_DPUS PERF=1 DYNAMIC=1 MAX_DISTANCE_THRESHOLD=100000
+    echo "\n Running experiment for NR_TASKLETS=$NR_TASKLETS NR_DPUS=$NR_DPUS file=$1 repetition=$i\n" >> $EXP_FILE
+        ./bin/ulsapim_host -i /home/upmem0046/aalonso/inputs/$1 -s "$2" >> $EXP_FILE
 done
+
+echo "\n\n\n\n\n !!!!!!!!!!!!!!!!!!!!!! EXECUTION FINISHED $1 !!!!!!!!!!!!!!!!!!!!!! \n\n\n\n\n" 

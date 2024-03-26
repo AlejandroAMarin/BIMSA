@@ -257,7 +257,7 @@ void run_set(uint64_t num_pairs_per_dpu, uint64_t batch_pairs_per_dpu,
 	// Run kernel on DPUs
 	if (rep >= n_warmup)
 	{
-		start(timer, 2, rep - n_warmup);
+		start(timer, 2);
 	#if ENERGY
 		DPU_ASSERT(dpu_probe_start(&probe));
 	#endif
@@ -294,7 +294,7 @@ void send_data(char* patterns, char* texts,
 		fflush(stdout);
 
 		if (rep >= n_warmup)
-			start(timer, 1, rep - n_warmup);
+			start(timer, 1);
 
 		*mem_offset = SEQ_TRANSFER; // offset points to first MRAM address
 		// printf("[VERBOSE] HOST ma pattern %d\n", mem_offset[set]);
@@ -360,7 +360,7 @@ void retrieve_cigars(struct dpu_set_t dpu_set, uint64_t num_pairs_per_dpu,
 	fflush(stdout);
 	struct dpu_set_t dpu;
 	if (rep >= n_warmup)
-		start(timer, 5, rep - n_warmup);
+		start(timer, 5);
 	
 	mem_offset += NR_TASKLETS * (4 * offsets_size_per_tl);
 	int i = 0;
@@ -401,7 +401,7 @@ void retrieve_and_recover(struct dpu_set_t dpu_set,	uint32_t batch_pairs_per_dpu
 	fflush(stdout);
 	struct dpu_set_t dpu;
 	if (rep >= n_warmup)
-		start(timer, 3, rep - n_warmup);
+		start(timer, 3);
 
 	int i = 0;
 	// Copy back the DPU results (mem_offset[set] already points to the results starting memory position)
@@ -479,7 +479,7 @@ void retrieve_and_recover(struct dpu_set_t dpu_set,	uint32_t batch_pairs_per_dpu
 
 	if( omp_get_thread_num() > 0){
 	cpu_recovery(patterns, texts, pattern_lengths, 
-                    text_lengths, cpu_pairs_idx, (*over_distance), longest_seq, timer);
+                    text_lengths, cpu_pairs_idx, (*over_distance), longest_seq);
 	// #pragma omp single
 	// {
 	// printf(""ANSI_COLOR_GREEN "OK" ANSI_COLOR_RESET".\n");
@@ -678,7 +678,7 @@ int main(int argc, char **argv){
 
 	}
 	//stop(&initialization, 1);
-	start(&initialization, 1, 1);
+	start(&initialization, 1);
   	file_status = read_sequence_data(p.input_file, patterns_set, texts_set,
 						pattern_lengths_set, text_lengths_set,
 						p.num_sets, num_pairs_set, longest_seq_set, p.max_pairs);
@@ -689,7 +689,7 @@ int main(int argc, char **argv){
 	printf("\n");
 	// printf("[VERBOSE] num pairs %ld and longest seq %ld\n", num_pairs[set], longest_seq[set]);
 
-	start(&initialization, 1, 1);
+	start(&initialization, 1);
 	float flt_num_pairs_per_dpu;
 	uint64_t num_pairs_per_dpu;
 	uint64_t num_pairs_alloc;
@@ -805,7 +805,6 @@ int main(int argc, char **argv){
 	uint32_t spare_dpu_pairs = 0;
 	uint64_t over_distance = 0;
 	bool terminate = 0;
-	int thread_count = 0;
 	if(num_pairs_alloc <= BATCH_SIZE || BATCH_SIZE == 0){
 		n_batches = 1;
 		batch_pairs_per_dpu = num_pairs_alloc / NR_DPUS;
@@ -824,14 +823,14 @@ int main(int argc, char **argv){
 	omp_set_num_threads(17);
 
 	for (uint32_t rep = 0; rep < p.n_warmup + p.n_reps; rep++) { // Loop adding compute weight and warmup
-		start(&timer, 6, 1);
+		start(&timer, 6);
 		send_data(patterns, texts,
 					pattern_lengths, text_lengths,
 					num_pairs, num_pairs_per_dpu,
 					longest_seq, &dpu_set, &nr_of_dpus,
 					rep, p.n_warmup, &timer, &mem_offset);
 		
-		start(&timer, 4, 1);
+		start(&timer, 4);
 		#pragma omp parallel shared(over_distance, cpu_pairs_idx)
 		{
 		for(uint32_t batch_idx = 0; batch_idx < n_batches; batch_idx++){

@@ -46,7 +46,7 @@ typedef struct Timer{
 
 }Timer;
 
-void start(Timer *timer, int i, int rep);
+void start(Timer *timer, int i);
 
 void stop(Timer *timer, int i);
 

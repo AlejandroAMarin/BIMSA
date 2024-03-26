@@ -153,15 +153,29 @@ typedef struct {
 #ifndef ENERGY
 #define ENERGY 0
 #endif
+
+#ifndef PRINT
 #define PRINT 0
-#define DEBUG 1
+#endif
+#ifndef DEBUG
+#define DEBUG 0
+#endif
+#ifndef MAX_DISTANCE_THRESHOLD
+#define MAX_DISTANCE_THRESHOLD 50
+#endif
+#ifndef MAX_ERROR
+#define MAX_ERROR 0.20
+#endif
+#ifndef DYNAMIC
+#define DYNAMIC 0
+#endif
+
+// static parameters
+#define BATCH_SIZE 0
 #define WAVEFRONT_BAND 30
 #define BASE_BAND 10
 #define MIN_WFA_LEN 10
 #define MAX_DISTANCE_ADAPTIVE 50
-#define MAX_DISTANCE_THRESHOLD 50
-#define MAX_ERROR 0.20
-#define BATCH_SIZE 0
 
 #define ANSI_COLOR_RED     "\x1b[31m"
 #define ANSI_COLOR_GREEN   "\x1b[32m"

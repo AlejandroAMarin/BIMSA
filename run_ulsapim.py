@@ -4,8 +4,7 @@ import subprocess
 
 def run_make_command(code_directory, args):
     exec_call = ['make', f'NR_TASKLETS={args.tasklets}', f'NR_DPUS={args.dpus}', 
-        f'BL={args.block_size}', f'BLI={args.block_size_inputs}', f'SZ={args.stack_size}', 
-        f'VERSION={args.version}']
+        f'BL={args.block_size}', f'BLI={args.block_size_inputs}']
     if args.perf_instructions and not args.perf_cycles:
         exec_call.append("PERF=1")
         exec_call.append("PERF_INSTRUCTIONS=1")
@@ -44,8 +43,6 @@ def main():
     parser.add_argument('-d', '--dpus', help='Number of DPUs (dafault 1)', required=False, default=1)
     parser.add_argument('-bl', '--block_size', help='Wavefront transfer and cache size in power of 2', required=False, default=8)
     parser.add_argument('-bli', '--block_size_inputs', help='Sequence and CIGAR transfer and cache size in power of 2', required=False, default=5)
-    parser.add_argument('-sz', '--stack_size', help='Size of the stack', required=False, default=1024)
-    parser.add_argument('-v', '--version', help='Use recursive or iterative implementation (default iterative)', required=False, default="iterative")
     parser.add_argument('-bd', '--banded', help='Use banded heuristic', required=False, action='store_true')
     parser.add_argument('-ad', '--adaptive', help='Use adaptive heuristic', required=False, action='store_true')
     parser.add_argument('-s', '--sets', help='Define different sequence size sets', required=True)

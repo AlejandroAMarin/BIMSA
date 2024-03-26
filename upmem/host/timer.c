@@ -6,7 +6,7 @@ void timer_init(Timer *timer, int i){
     timer->time[i] = 0.0;
 }
 
-void start(Timer *timer, int i, int rep) {
+void start(Timer *timer, int i) {
     gettimeofday(&timer->startTime[i], NULL);
 }
 

@@ -29,11 +29,11 @@ uint32_t global_pair = 0;
 
 int(*kernels[nr_kernels])(void) = {main_kernel1};
 
-uint32_t get_next_pair(){
+uint32_t get_next_pair(const uint32_t offset){
 	uint32_t pair;
 	mutex_lock(my_mutex);
 		pair = global_pair;
-		global_pair +=2;
+		global_pair += offset;
 	mutex_unlock(my_mutex);
 
 	return pair;
@@ -86,8 +86,13 @@ int main_kernel1() {
 		spare_tasklet_pairs =  spare_dpu_pairs / NR_TASKLETS;
 	}
 	// Parameters
-	const uint32_t num_pairs_per_tasklet = num_pairs_per_dpu / NR_TASKLETS;
-	const uint32_t batch_pairs_per_tasklet = batch_pairs_per_dpu / NR_TASKLETS;
+	//const uint32_t num_pairs_per_tasklet = num_pairs_per_dpu / NR_TASKLETS;
+	//const uint32_t batch_pairs_per_tasklet = batch_pairs_per_dpu / NR_TASKLETS;
+	#if DYNAMIC
+		const uint32_t offset = 2;
+	#else
+		const uint32_t offset = batch_pairs_per_dpu / NR_TASKLETS;;
+	#endif
 	//uint32_t my_first_pair = tasklet_id * (batch_pairs_per_tasklet - spare_tasklet_pairs); // first pair for all tasklets in first batch
 	// uint32_t pair = batch_pairs_per_dpu * batch_idx + // What batch I'm in
 	// 				(batch_pairs_per_tasklet - spare_tasklet_pairs) * tasklet_id; // Offset pair inside batch
@@ -210,14 +215,10 @@ int main_kernel1() {
 	// Iterate over pairs
 	while(1)
 	{
-		pair = get_next_pair();
+		pair = get_next_pair(offset);
 		if(pair >= batch_pairs_per_dpu) break;
-	// for(;pair < ending_pair; pair++)
-	// {
-		// TODO PROBLEMA CON LA PAIR 0
 
-
-	for(int i = 0; i < 2; i++)
+	for(uint32_t i = 0; i < offset; i++)
 	{
 		
 		cma_cigar_aux = ma_cigar_aux + cigar_length*sizeof(char)+8;

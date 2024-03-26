@@ -10,7 +10,7 @@
 #include <omp.h>
 
 void cpu_recovery(char* patterns, char* texts, uint32_t* pattern_lengths, 
-                    uint32_t* text_lengths, uint32_t* cpu_pairs_idx , uint64_t n_sequences, uint64_t longest_seq, Timer* time){
+                    uint32_t* text_lengths, uint32_t* cpu_pairs_idx , uint64_t n_sequences, uint64_t longest_seq){
     //start(time, 4, 1);
     wavefront_aligner_attr_t attributes = wavefront_aligner_attr_default;
     attributes.distance_metric = edit;
