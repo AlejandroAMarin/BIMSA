@@ -1842,7 +1842,7 @@ int find_breakpoint_iterative(int32_t pattern_length, int32_t text_length,
 			#endif
 		}
 		if(overlap) {
-			if(distance_fw + distance_rv + 2 >= threshold){
+			if(distance_fw + distance_rv + 4 >= threshold){
 				//Write 2 tasks meta data
 				// task right
 				pair_metadata.p_len = pattern_length - EWAVEFRONT_V(k,offset); //pattern_length;
@@ -1991,7 +1991,7 @@ int find_breakpoint_iterative(int32_t pattern_length, int32_t text_length,
 
 		if(overlap) {
 			
-			if(distance_fw + distance_rv + 2 >= threshold){
+			if(distance_fw + distance_rv + 4 >= threshold){
 				//Write 2 tasks meta data
 				// task right
 				pair_metadata.p_len = pattern_length - EWAVEFRONT_V(k,offset); // pattern_length;

@@ -169,9 +169,10 @@ typedef struct {
 #ifndef DYNAMIC
 #define DYNAMIC 0
 #endif
-
-// static parameters
+#ifndef BATCH_SIZE
 #define BATCH_SIZE 0
+#endif
+// static parameters
 #define WAVEFRONT_BAND 30
 #define BASE_BAND 10
 #define MIN_WFA_LEN 10

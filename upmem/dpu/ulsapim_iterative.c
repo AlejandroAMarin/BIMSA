@@ -91,7 +91,7 @@ int main_kernel1() {
 	#if DYNAMIC
 		const uint32_t offset = 2;
 	#else
-		const uint32_t offset = batch_pairs_per_dpu / NR_TASKLETS;;
+		const uint32_t offset = batch_pairs_per_dpu / NR_TASKLETS;
 	#endif
 	//uint32_t my_first_pair = tasklet_id * (batch_pairs_per_tasklet - spare_tasklet_pairs); // first pair for all tasklets in first batch
 	// uint32_t pair = batch_pairs_per_dpu * batch_idx + // What batch I'm in
@@ -297,11 +297,12 @@ int main_kernel1() {
 
 		if(distance == -1){
 			loop = 0;
+			#if PRINT
 			printf("[DPU] first breakpoint exceeds max distance\n");
+			#endif
 		} 
 		//if(task_idx<0 && cma_tasks == ma_tasks || distance == 0) loop = 0;
 		if(distance == 0) loop = 0;
-
 		// profiling_start(&other_breakpoints);
 		while(loop){
 			// read a task
@@ -367,7 +368,7 @@ int main_kernel1() {
 		// ma_results += 8;
 		// Write back te results to HOST
 		cache_distances[read_idx_distances] = distance;
-		//if(batch_idx == 4)printf("[DPU] TL %d pair %d distance = %d\n", me(), pair, distance);
+		//printf("[DPU] TL %d pair %d distance = %d\n", me(), pair, distance);
 		read_idx_distances++;
 		if(read_idx_distances == 2) // Min numpairs per tasklet to compute
 		{
@@ -376,9 +377,7 @@ int main_kernel1() {
 		}
 
 		pair++;
-	 	if(pair >= batch_pairs_per_dpu) break;
 	}
-	// 	if(pair >= batch_pairs_per_dpu) break;
 	}
 	
 	#if PERF_MAIN

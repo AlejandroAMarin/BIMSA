@@ -305,7 +305,7 @@ void send_data(char* patterns, char* texts,
 		}
 
 		DPU_ASSERT(dpu_push_xfer(*dpu_set, DPU_XFER_TO_DPU, DPU_MRAM_HEAP_POINTER_NAME, *mem_offset, longest_seq * num_pairs_per_dpu * sizeof(char), DPU_XFER_DEFAULT));
-		// printf("[VERBOSE] HOST pattern sent %ld bytes\n", longest_seq[set] * num_pairs_per_dpu[set] * sizeof(char));
+		//printf("[VERBOSE] HOST pattern sent %ld bytes\n", longest_seq * num_pairs_per_dpu * sizeof(char));
 
     	i = 0;
 		*mem_offset += (longest_seq * num_pairs_per_dpu * sizeof(char)); // of
@@ -316,7 +316,7 @@ void send_data(char* patterns, char* texts,
 		}
 
 		DPU_ASSERT(dpu_push_xfer(*dpu_set, DPU_XFER_TO_DPU, DPU_MRAM_HEAP_POINTER_NAME, *mem_offset, longest_seq * num_pairs_per_dpu * sizeof(char), DPU_XFER_DEFAULT));
-		// printf("[VERBOSE] HOST text sent %ld bytes\n", longest_seq[set] * num_pairs_per_dpu[set] * sizeof(char));
+		//printf("[VERBOSE] HOST text sent %ld bytes\n", longest_seq * num_pairs_per_dpu * sizeof(char));
 
 		i = 0;
 		*mem_offset += (longest_seq * num_pairs_per_dpu * sizeof(char)); // offset points to end of texts array
@@ -370,7 +370,7 @@ void retrieve_cigars(struct dpu_set_t dpu_set, uint64_t num_pairs_per_dpu,
 	}
 	DPU_ASSERT(dpu_push_xfer(dpu_set, DPU_XFER_FROM_DPU, DPU_MRAM_HEAP_POINTER_NAME,
 				mem_offset, num_pairs_per_dpu * cigar_length * sizeof(char), DPU_XFER_DEFAULT));
-	// printf("[VERBOSE] HOST CIGAR recieved %ld bytes\n", num_pairs_per_dpu[set] * cigar_length[set] * sizeof(char));
+	//printf("[VERBOSE] HOST CIGAR recieved %ld bytes\n", num_pairs_per_dpu * cigar_length * sizeof(char));
 
 	if(rep >= n_warmup)
 		stop(timer, 5);
@@ -442,7 +442,7 @@ void retrieve_and_recover(struct dpu_set_t dpu_set,	uint32_t batch_pairs_per_dpu
 
 	DPU_ASSERT(dpu_push_xfer(dpu_set, DPU_XFER_FROM_DPU, DPU_MRAM_HEAP_POINTER_NAME,
 				*mem_offset, (batch_pairs_per_dpu - spare_dpu_pairs) * sizeof(int32_t), DPU_XFER_DEFAULT));
-	// printf("[VERBOSE] HOST distances recieved %ld bytes\n", num_pairs_per_dpu[set] * sizeof(int32_t));
+	//printf("[VERBOSE] HOST distances recieved %ld bytes\n", (batch_pairs_per_dpu - spare_dpu_pairs) * sizeof(int32_t) * NR_DPUS);
 
 	if(rep >= n_warmup)
 		stop(timer, 3);
@@ -465,7 +465,7 @@ void retrieve_and_recover(struct dpu_set_t dpu_set,	uint32_t batch_pairs_per_dpu
 		{
 			//printf("\n[DEBUG] bad distance %d for batch %d\n", dpu_distances[j], batch_idx);
 			if(dpu_distances[i * num_pairs_per_dpu + j] == -1){
-				cpu_pairs_idx[(*over_distance)] = j;
+				cpu_pairs_idx[(*over_distance)] = i * num_pairs_per_dpu + j;
 				(*over_distance)++;
 			}
 		}
