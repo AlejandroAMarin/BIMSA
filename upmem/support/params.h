@@ -40,7 +40,8 @@ void usage() {
     //p.max_pairs = 2500;
     //p.max_pairs     = 4;
     p.num_sets = 0;
-    p.sets = (int*)realloc(p.sets, p.num_sets * sizeof(int));
+    //p.sets = (int*)realloc(p.sets, p.num_sets * sizeof(int));    
+    p.sets = NULL;
     //p.sets[0] = 18319;
     // p.sets[1] = 10000;
     // p.sets[2] = 12000;

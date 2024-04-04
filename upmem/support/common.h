@@ -177,6 +177,11 @@ typedef struct {
 #define BASE_BAND 10
 #define MIN_WFA_LEN 10
 #define MAX_DISTANCE_ADAPTIVE 50
+#define PERF 0
+#define PERF_INSTRUCTIONS 0
+#define PERF_CYCLES 0
+#define PERF_MAIN 0
+#define PERF_SECTIONS 0
 
 #define ANSI_COLOR_RED     "\x1b[31m"
 #define ANSI_COLOR_GREEN   "\x1b[32m"
