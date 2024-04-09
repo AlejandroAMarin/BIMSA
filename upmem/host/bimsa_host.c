@@ -29,6 +29,7 @@
 #include "params.h"
 //#include "timer.h"
 #include "common.h"
+#include "rapl-read.h"
 
 // Define the DPU Binary path as DPU_BINARY here
 #define DPU_BINARY "./bin/bimsa"
@@ -36,6 +37,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#define NUM_EVENTS 1
 
 #define MAX_LINE_LENGTH 1500000
 
@@ -443,7 +446,7 @@ void retrieve_and_recover(struct dpu_set_t dpu_set,	uint32_t batch_pairs_per_dpu
 
 	DPU_ASSERT(dpu_push_xfer(dpu_set, DPU_XFER_FROM_DPU, DPU_MRAM_HEAP_POINTER_NAME,
 				*mem_offset, (batch_pairs_per_dpu - spare_dpu_pairs) * sizeof(int32_t), DPU_XFER_DEFAULT));
-	//printf("[VERBOSE] HOST distances recieved %ld bytes\n", (batch_pairs_per_dpu - spare_dpu_pairs) * sizeof(int32_t) * NR_DPUS);
+	printf("[VERBOSE] HOST distances recieved %ld bytes\n", (batch_pairs_per_dpu - spare_dpu_pairs) * sizeof(int32_t) * NR_DPUS);
 
 	if(rep >= n_warmup)
 		stop(timer, 3);
@@ -478,15 +481,27 @@ void retrieve_and_recover(struct dpu_set_t dpu_set,	uint32_t batch_pairs_per_dpu
 
 	#pragma omp barrier
 
-
+        #pragma omp master
+	{
+           rapl_perf_start();
+	}
 	if( omp_get_thread_num() > 0){
-	cpu_recovery(patterns, texts, pattern_lengths, 
+		cpu_recovery(patterns, texts, pattern_lengths, 
                     text_lengths, cpu_pairs_idx, (*over_distance), longest_seq);
+
+
 	// #pragma omp single
 	// {
 	// printf(""ANSI_COLOR_GREEN "OK" ANSI_COLOR_RESET".\n");
 	// }
 	/// CPU RECOVERY ///
+	}
+#pragma omp barrier
+
+#pragma omp master
+	{
+rapl_perf_end();
+rapl_perf_print();
 	}
 }
 
@@ -587,6 +602,10 @@ int main(int argc, char **argv){
 	printf(ANSI_COLOR_YELLOW "###############################################\n" ANSI_COLOR_RESET);
 	printf(ANSI_COLOR_YELLOW "|------------------- BIMSA -------------------|\n" ANSI_COLOR_RESET);
 	printf(ANSI_COLOR_YELLOW "###############################################\n" ANSI_COLOR_RESET);
+
+
+rapl_perf_init();
+
 
   if(strcmp(p.input_file, "UNSET") == 0)
 	{
