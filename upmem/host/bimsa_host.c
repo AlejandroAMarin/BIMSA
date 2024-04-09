@@ -20,6 +20,7 @@
 #include <dpu_log.h>
 
 #include "wfa_cpu.h"
+#include "../../papi/src/papi.h"
 
 #if ENERGY
 #include <dpu_probe.h>
@@ -476,6 +477,7 @@ void retrieve_and_recover(struct dpu_set_t dpu_set,	uint32_t batch_pairs_per_dpu
 	}
 
 	#pragma omp barrier
+
 
 	if( omp_get_thread_num() > 0){
 	cpu_recovery(patterns, texts, pattern_lengths, 

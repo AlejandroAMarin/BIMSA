@@ -18,10 +18,11 @@ MAX_ERROR ?= 0.20
 DYNAMIC ?= 0
 BATCH_SIZE ?= 0
 #SZ ?=8192
+PAPI_DIR=../papi/src/install
 
 SRC_WFA_CPU := $(wildcard ${HOST_DIR}/wfa_cpu.c)
 ARGS=-I . -Ilib/
-ARGS_WFA_CPU=-L../WFA2-lib/lib/ $(ARGS) -I../WFA2-lib/ -lwfa
+ARGS_WFA_CPU=-L../WFA2-lib/lib/ $(ARGS) -I../WFA2-lib/  -I/${PAPI_DIR}/include -L/${PAPI_DIR}/lib -lwfa -lpapi
 
 
 define conf_filename
