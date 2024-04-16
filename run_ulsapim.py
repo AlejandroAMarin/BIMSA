@@ -4,17 +4,11 @@ import subprocess
 
 def run_make_command(code_directory, args):
     exec_call = ['make', f'NR_TASKLETS={args.tasklets}', f'NR_DPUS={args.dpus}', 
-        f'BL={args.block_size}', f'BLI={args.block_size_inputs}']
-    if args.perf_instructions and not args.perf_cycles:
-        exec_call.append("PERF=1")
-        exec_call.append("PERF_INSTRUCTIONS=1")
-    if args.perf_cycles and not args.perf_instructions:
-        exec_call.append("PERF=1")
-        exec_call.append("PERF_CYLES=1")
-    if args.perf_instructions and args.perf_cycles:
-        print("Can not profile cycles and instructions at the same time. Using INSTRUCTIONS as dafault...")
-        exec_call.append("PERF=1")
-        exec_call.append("PERF_INSTRUCTIONS=1")
+        f'WFT={args.wf_trans}', f'SEQT={args.seq_trans}', 
+        f'CIGART={args.cigar_trans}', 
+        f'MAX_DISTANCE_THRESHOLD={args.max_distance}', f'MAX_ERROR={round((args.max_distance * 2)/int(args.size), 2)}',
+        f'DYNAMIC={args.dynamic}', f'BATCH_SIZE={args.batch_size}',
+        f'PRINT={args.print}', f'DEBUG={args.debug}']
     if args.banded:
         exec_call.append("BANDED=1")
     if args.adaptive:
@@ -29,7 +23,7 @@ def run_make_command(code_directory, args):
         exit(1)
 
 def run_c_program(code_directory, args):
-    exec_call = ['./bin/ulsapim_host', '-i', f"{args.file}", '-s', f'{args.sets}']
+    exec_call = ['./bin/bimsa_host', '-i', f"../{args.file}", '-s', f'{args.size}']
     try:
         subprocess.check_call(exec_call,cwd=code_directory)
     except subprocess.CalledProcessError as e:
@@ -39,15 +33,19 @@ def run_c_program(code_directory, args):
 def main():
     parser = argparse.ArgumentParser(description='Python program to run make and execute a C program with an input file.')
     parser.add_argument('-f', '--file', help='Path to the input file', required=True)
-    parser.add_argument('-t', '--tasklets', help='Number of tasklets (default 1)', required=False, default=1)
-    parser.add_argument('-d', '--dpus', help='Number of DPUs (dafault 1)', required=False, default=1)
-    parser.add_argument('-bl', '--block_size', help='Wavefront transfer and cache size in power of 2', required=False, default=8)
-    parser.add_argument('-bli', '--block_size_inputs', help='Sequence and CIGAR transfer and cache size in power of 2', required=False, default=5)
+    parser.add_argument('-t', '--tasklets', help='Number of tasklets (default 12)', required=False, default=12)
+    parser.add_argument('-d', '--dpus', help='Number of DPUs (dafault 2500)', required=False, default=2500)
+    parser.add_argument('-wt', '--wf_trans', help='Wavefront transfer and cache size in power of 2', required=False, default=9)
+    parser.add_argument('-st', '--seq_trans', help='Sequence and CIGAR transfer and cache size in power of 2', required=False, default=3)
+    parser.add_argument('-ct', '--cigar_trans', help='Sequence and CIGAR transfer and cache size in power of 2', required=False, default=9)
+    parser.add_argument('-s', '--size', help='Define maximum sequence size', required=True)
+    parser.add_argument('-m', '--max_distance', help='Maximum wavefront distance (default 5000)', required=False, default=5000)
+    parser.add_argument('-b', '--batch_size', help='Number of pairs to be executed in batches (default 0)', required=False, default=0)
+    parser.add_argument('-dn', '--dynamic', help='Asign pairs dynamically to threads', required=False, action='store_true')
+    parser.add_argument('-p', '--print', help='Print extra dpu execution information', required=False, action='store_true')
+    parser.add_argument('-db', '--debug', help='Print extra validation information', required=False, action='store_true')
     parser.add_argument('-bd', '--banded', help='Use banded heuristic', required=False, action='store_true')
     parser.add_argument('-ad', '--adaptive', help='Use adaptive heuristic', required=False, action='store_true')
-    parser.add_argument('-s', '--sets', help='Define different sequence size sets', required=True)
-    parser.add_argument('-pi', '--perf_instructions', help='Profile instructions', action='store_true')
-    parser.add_argument('-pc', '--perf_cycles', help='Profile cycles', action='store_true')
 
     args = parser.parse_args()
     code_directory = "upmem/"
