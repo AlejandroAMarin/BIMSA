@@ -69,7 +69,7 @@
 #define MRAM_LIMIT 64000000
 #define WRAM_LIMIT 64000
 
-#define QUEUE_SZ 32768
+#define QUEUE_SZ 65536
 
 char op_to_str[5] = {'M', 'X', 'I', 'D', '?'};
 

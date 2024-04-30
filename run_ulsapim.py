@@ -6,9 +6,14 @@ def run_make_command(code_directory, args):
     exec_call = ['make', f'NR_TASKLETS={args.tasklets}', f'NR_DPUS={args.dpus}', 
         f'WFT={args.wf_trans}', f'SEQT={args.seq_trans}', 
         f'CIGART={args.cigar_trans}', 
-        f'MAX_DISTANCE_THRESHOLD={args.max_distance}', f'MAX_ERROR={round((args.max_distance * 2)/int(args.size), 2)}',
-        f'DYNAMIC={args.dynamic}', f'BATCH_SIZE={args.batch_size}',
-        f'PRINT={args.print}', f'DEBUG={args.debug}']
+        f'MAX_DISTANCE_THRESHOLD={int(args.max_distance)}', f'MAX_ERROR={round((int(args.max_distance) * 2)/int(args.size), 2)}',
+        f'BATCH_SIZE={args.batch_size}']
+    if args.print:
+        exec_call.append("DYNAMIC=1")
+    if args.print:
+        exec_call.append("PRINT=1")
+    if args.debug:
+        exec_call.append("DEBUG=1")
     if args.banded:
         exec_call.append("BANDED=1")
     if args.adaptive:
