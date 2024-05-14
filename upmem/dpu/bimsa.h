@@ -1796,7 +1796,7 @@ int find_breakpoint_iterative(int32_t pattern_length, int32_t text_length,
 			return -1;
 		}
 
-		if((((wf_fw_hi+1) - (wf_fw_lo-1)) + 1)*4 > wffw_transfer_size && wffw_transfer_size < WF_TRANSFER){
+		if((((wf_fw_hi+1) - (wf_fw_lo-1)) + 2)*4 > wffw_transfer_size && wffw_transfer_size < WF_TRANSFER){
 			wffw_transfer_size = wffw_transfer_size << 1;
 			//wffw_transfer_size += 16;
 		}
@@ -1942,7 +1942,7 @@ int find_breakpoint_iterative(int32_t pattern_length, int32_t text_length,
 			return -1;
 		}
 		
-		if((((wf_fw_hi+1) - (wf_fw_lo-1)) + 1)*4 > wfrv_transfer_size && wfrv_transfer_size < WF_TRANSFER){
+		if((((wf_fw_hi+1) - (wf_fw_lo-1)) + 2)*4 > wfrv_transfer_size && wfrv_transfer_size < WF_TRANSFER){
 			wfrv_transfer_size = wfrv_transfer_size << 1;
 			//wfrv_transfer_size += 16;
 		}

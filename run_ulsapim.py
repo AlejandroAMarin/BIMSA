@@ -3,10 +3,13 @@ import os
 import subprocess
 
 def run_make_command(code_directory, args):
+    max_error = 0.20
+    if (int(args.max_distance) * 2)/int(args.size) > max_error:
+        max_error = round((int(args.max_distance) * 2)/int(args.size), 2)
     exec_call = ['make', f'NR_TASKLETS={args.tasklets}', f'NR_DPUS={args.dpus}', 
         f'WFT={args.wf_trans}', f'SEQT={args.seq_trans}', 
         f'CIGART={args.cigar_trans}', 
-        f'MAX_DISTANCE_THRESHOLD={int(args.max_distance)}', f'MAX_ERROR={round((int(args.max_distance) * 2)/int(args.size), 2)}',
+        f'MAX_DISTANCE_THRESHOLD={int(args.max_distance)}', f'MAX_ERROR={max_error}',
         f'BATCH_SIZE={args.batch_size}']
     if args.print:
         exec_call.append("DYNAMIC=1")

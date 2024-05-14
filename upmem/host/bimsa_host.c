@@ -856,6 +856,10 @@ int main(int argc, char **argv){
 			while(!set_finished){
 				dpu_status(dpu_set, &set_finished, &set_failed);
 				if(set_failed){
+					if (rep >= p.n_warmup)
+					{
+						stop(&timer, 2);
+					}
 					printf("[ERROR] DPU EXECUTION FAILED\n");
 					#if PRINT
 					DPU_FOREACH(dpu_set, dpu_fail) {
@@ -865,7 +869,7 @@ int main(int argc, char **argv){
 					DPU_ASSERT(dpu_free(dpu_set));
 					#pragma omp atomic write
 					terminate = 1;
-					break;
+					//break;
 				}
 				if (set_finished)
 				{
@@ -910,10 +914,11 @@ int main(int argc, char **argv){
 		}
 		stop(&timer, 4);
 		//printf("[DEBUG] reached end of parellel reagion...\n");
-		if(terminate) return 0;
+		if(!terminate){
 		retrieve_cigars(dpu_set, num_pairs_per_dpu, offsets_size_per_tl,
 						mem_offset, cigar, cigar_length, 
 						&timer, rep, p.n_warmup);
+		}
 		stop(&timer, 6);
 
 		#if PERF_MAIN
