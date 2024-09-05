@@ -1,40 +1,83 @@
 # BIMSA: Bidirectional In Memory Sequence Aligner
 Implementation of a distance-based Bidirectional Wavefront Algorithm tailored for the UPMEM architecture.
 
-## Prerequisites
-You need to have the UPMEM SDK installed or access to a UPMEM, please follow the instructions here:
+## Setting up the UPMEM local simulator
+Python is required if not installed.
+```
+sudo apt install python3
+```
+
+Download the UPMEM SDK from the following source:
 
 https://sdk.upmem.com/
 
-And remember to source the enviromental variables:
+1. Untar the binary package, for instance into `$HOME/upmem-sdk` directory.
+2. Source the script `$HOME/upmem-sdk/upmem_env.sh` to set environment variables to appropriate values.
 ```
-source path-to-upmem-sdk/upmem_env.sh
-```
-
-## Getting Started
-Clone this repository:
-```
-git clone https://gitlab.bsc.es/ifernand/wfa-upmem.git
+mkdir $HOME/upmem-sdk
+tar --strip-components=1 -zxvf $HOME/upmem-2023.2.0-Linux-x86_64.tar.gz -C $HOME/upmem-sdk
+source $HOME/upmem-sdk/upmem_env.sh simulator
 ```
 
-## Generating some example inputs
-
+## Getting started with BIMSA
+Clone this repository and init the submodule:
 ```
-cd tools/generate_dataset/
+git clone git@github.com:AlejandroAMarin/BIMSA.git
+cd BIMSA
+git submodule init
+git submodule update
+```
+
+Run a unitest:
+```
+python3 run_bimsa.py -d 2 -t 4 -f $HOME/BIMSA/inputs/wfa.utest.seq -s 20000
+```
+
+## Generating new synthetic inputs
+To generate new synthetic inputs, first compile the tool, second run the script indicating your file sizes and error.
+```
+cd $HOME/BIMSA/tools/generate_dataset/
 make
-cd ../../scripts/
-python3 generate_inputs.py
+cd $HOME/BIMSA/scripts/
+python3 gen_input.py -n 10 -l 100 -e 0.02
 ```
-## Running BIMSA
+Run BIMSA on the new created inputs:
+```
+cd $HOME/BIMSA
+python3 run_bimsa.py -d 2 -t 2 -f $HOME/projects/BIMSA/inputs/n10_l100_e2.seq -s 150
+```
+
+Generated files can be modified in number of pairs, sequence length and error rate.
+```
+usage: gen_input.py [-h] -n NR_PAIRS -l SEQ_LENGTH -e ERROR
+
+Generate datasets with specified parameters
+
+arguments:
+  -h, --help            show this help message and exit
+  -n NR_PAIRS, --nr_pairs NR_PAIRS
+                        Number of pairs (NR_PAIRS)
+  -l SEQ_LENGTH, --seq_length SEQ_LENGTH
+                        Sequence length (SEQ_LENGTH)
+  -e ERROR, --error ERROR
+                        Error rate (ERROR)
+```
+## UPMEM simulator limitations
+The UPMEM simulator is only able to run on 8 DPUs max and 24 tasklets.
+The times probided by the simulator are not equivalent to a real hardware execution. The results optained from the alignment are the same as an UPMEM server.
+
+## Running BIMSA on a UPMEM server
 BIMSA provides a python script to run with the different configurations.
 
 Have in mind that some configurations might saturate the resources, this script does not limit parameters if they surpass the simulator or server capabilities.
 
 ```
-usage: run_ulsapim.py [-h] -f FILE [-t TASKLETS] [-d DPUS] [-wt WF_TRANS]
-                      [-st SEQ_TRANS] [-ct CIGAR_TRANS] -s SIZE
-                      [-m MAX_DISTANCE] [-b BATCH_SIZE] [-dn] [-p] [-db] [-bd]
-                      [-ad]
+usage: run_bimsa.py [-h] -f FILE [-t TASKLETS] [-d DPUS] [-wt WF_TRANS]
+                    [-st SEQ_TRANS] [-ct CIGAR_TRANS] -s SIZE
+                    [-m MAX_DISTANCE] [-b BATCH_SIZE] [-dn] [-p] [-db] [-bd]
+                    [-ad]
+
+Python program to run make and execute a C program with an input file.
 
 arguments:
   -h, --help            show this help message and exit
