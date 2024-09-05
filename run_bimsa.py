@@ -31,7 +31,7 @@ def run_make_command(code_directory, args):
         exit(1)
 
 def run_c_program(code_directory, args):
-    exec_call = ['./bin/bimsa_host', '-i', f"../{args.file}", '-s', f'{args.size}']
+    exec_call = ['./bin/bimsa_host', '-i', f"{args.file}", '-s', f'{args.size}']
     try:
         subprocess.check_call(exec_call,cwd=code_directory)
     except subprocess.CalledProcessError as e:
