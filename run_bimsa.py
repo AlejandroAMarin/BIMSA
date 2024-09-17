@@ -11,7 +11,7 @@ def run_make_command(code_directory, args):
         f'CIGART={args.cigar_trans}', 
         f'MAX_DISTANCE_THRESHOLD={int(args.max_distance)}', f'MAX_ERROR={max_error}',
         f'BATCH_SIZE={args.batch_size}']
-    if args.print:
+    if args.dynamic:
         exec_call.append("DYNAMIC=1")
     if args.print:
         exec_call.append("PRINT=1")

@@ -46,6 +46,7 @@ Run BIMSA on the new created inputs:
 cd $HOME/BIMSA
 python3 run_bimsa.py -d 2 -t 2 -f $HOME/projects/BIMSA/inputs/n10_l100_e2.seq -s 150
 ```
+Be aware that the file generator creates files with sequence lengths aproximate to the indicated length, so the size `(-s)` on the BIMSA arguments must be at least 5% beyond the dataset sequence size. If the size is inferior to a sequence, this sequence will be discarded.
 
 Generated files can be modified in number of pairs, sequence length and error rate.
 ```
@@ -67,10 +68,44 @@ The UPMEM simulator is only able to run on 8 DPUs max and 24 tasklets.
 The times probided by the simulator are not equivalent to a real hardware execution. The results optained from the alignment are the same as an UPMEM server.
 
 ## Running BIMSA on a UPMEM server
-BIMSA provides a python script to run with the different configurations.
+On a UPMEM server all libraries should be installed, so BIMSA should run straighforward by cloning the repositorie. If there are any SDK problems, contact the UPMEM team for troubleshooting.
+```
+git clone git@github.com:AlejandroAMarin/BIMSA.git
+cd BIMSA
+git submodule init
+git submodule update
+```
+Create a large enough file to feed all the DPUs
+```
+cd $HOME/BIMSA/scripts/
+python3 gen_input.py -n 1000000 -l 200 -e 0.10
+```
 
-Have in mind that some configurations might saturate the resources, this script does not limit parameters if they surpass the simulator or server capabilities.
+Run the file indicating more DPUs and more tasklets using -d and -t respectively.
+```
+cd $HOME/BIMSA
+python3 run_bimsa.py -d 2500 -t 12 -f $HOME/projects/BIMSA/inputs/n1000000_l200_e10.seq -s 250
+```
 
+## Executing BIMSA-Hybrid for real datasets
+To execute real datasets with heterogeneus alignment sizes optimally. It is recomended to use BIMSA-Hybrid by tunning the parameters `-m` `-b` and using `--dynamic`.
+- `-m` Tunes the nominal distance threshold where the alingments are send to the CPU recovery. Unfortunately, the number of alignments which are recovered in CPU can not be indicated, but tunning must be done to the threshold in order to achieve the desired percentage of alignments recovered.
+- `-b` Tunes the number of alignments that fit in a batch so the number of batches is determined by the total number of alignments/batch_size. If the batches are used with the CPU recovery, the CPU and DPU kernel executions will overlap for each batch.
+- `--dynamic` Activates the dynamic asignment of alignments between tasklets, which improves performance for heterogeneus datasets.
+
+## Advanced BIMSA configurations
+The user can configure BIMSA's WRAM sctructure sizes by using the arguments `--wf_trans`, `--seq_trans`, `--cigar_trans` indicating the size in a number from 3 to 10 which refers to a power of 2 for the size in MB.
+- `--wf_trans` Controls the wavefront WRAM size.
+- `--seq_trans` Controls the number of characters read from the sequence for the WRAM at a given time.
+- `--cigar_trans` Controls the number of CIGAR characters stored in WRAM before they are written in MRAM.
+
+If BIMSA arises an error comunicating that the WRAM space is surpassed, lowering `--wf_trans`, `--seq_trans`, `--cigar_trans` or the number of tasklets `-t` will trade performance for WRAM space utillization, which will make the file executable.
+
+If BIMSA arises an error comunicating that the MRAM space is surpassed, only decreassing `-t` will trade performance for MRAM utilization. Additionally, if the number of sequences is enough to feed more DPUs, increasing `-d` will lower MRAM utilization. If MRAM utilization is superior to 100% with `-t 1` and using the maximum numbeber of DPUs, it means that the file is not supported for BIMSA execution.
+
+The arguments `-p`, `-db`, `-bd`, `-ad` are only for debugging and developing pourposes.
+
+## All BIMSA script arguments
 ```
 usage: run_bimsa.py [-h] -f FILE [-t TASKLETS] [-d DPUS] [-wt WF_TRANS]
                     [-st SEQ_TRANS] [-ct CIGAR_TRANS] -s SIZE
@@ -104,3 +139,5 @@ arguments:
   -bd, --banded         Use banded heuristic
   -ad, --adaptive       Use adaptive heuristic
 ```
+
+## For developers
