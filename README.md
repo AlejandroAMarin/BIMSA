@@ -31,7 +31,7 @@ Contents
 sudo apt install python3
 ```
 
-1. Download the UPMEM SDK from the following source: [upmem SDK](https://sdk.upmem.com/)
+1. Download the UPMEM SDK from the following source: [UPMEM SDK](https://sdk.upmem.com/)
 
 2. Untar the binary package, for instance into `$HOME/upmem-sdk` directory.
 3. Source the script `$HOME/upmem-sdk/upmem_env.sh` to set environment variables to appropriate values.
@@ -137,7 +137,7 @@ The user can configure BIMSA's WRAM sctructure sizes by using the arguments `--w
 > If BIMSA arises an error comunicating that the MRAM space is surpassed, only decreassing `-t` will trade performance for MRAM utilization. Additionally, if the number of sequences is enough to feed more DPUs, increasing `-d` will lower MRAM utilization. If MRAM utilization is superior to 100% with `-t 1` and using the maximum numbeber of DPUs, it means that the file is not supported for BIMSA execution.
 
 > [!WARNING]
-> The arguments `-p`, `-db`, `-bd`, `-ad` are only for debugging and > developing pourposes.
+> The arguments `-p`, `-db`, `-bd`, `-ad` are only for debugging and developing pourposes. The heuristics code is not maintained.
 
 ## All BIMSA script arguments
 ```
@@ -175,3 +175,34 @@ arguments:
 ```
 
 ## For developers
+This section is aimed to users who are curious about the structure and basic functionallity of a UPMEM application.
+
+UPMEM applications are composed mainly by a host file and a DPU kernel file. Both files are written in regular C using UPMEM library directives.
+
+The DPU kernel file is compiled using the UPMEM SDK directive.
+
+The host file is compiled using the regular gcc, but using the includes of UPMEM libraries inside the code.
+
+Once both files are compiled, the host file will run and manage the DPU kernel code by using the UPMEM library directives.
+
+The UPMEM programming paradigm is very similar to the CUDA programming paradigm regarding directives and code organization.
+
+### UPMEM code file layout
+```text
+BIMSA/
+├─ upmem/
+│  ├─ dpu/
+│  │  ├─ bimsa.c  <- Main DPU kernel
+│  │  └─ bimsa.h  <- DPU kernel biwfa library functions
+│  ├─ host/
+│  │  ├─ bimsa_host.c  <- Main host file
+│  │  ├─ timer.c
+│  │  ├─ wfa_cpu.c  <- CPU recovery
+│  │  └─ wfa_cpu.h
+│  ├─ support/
+│  │  ├─ common.h
+│  │  ├─ counterperf.h
+│  │  ├─ params.h
+│  │  └─ timer.h
+│  └─ Makefile
+```
