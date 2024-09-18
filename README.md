@@ -1,18 +1,40 @@
 # BIMSA: Bidirectional In Memory Sequence Aligner
 Implementation of a distance-based Bidirectional Wavefront Algorithm tailored for the UPMEM architecture.
 
+## Features
+
+* Calculates **edit distance (Levenshtein distance)** and the **optimal alignment path (CIGAR)**.
+* It scales to **long and noisy sequences** as long as the allocated memory does not surpass the **MRAM limit** (64MB).
+* Includes a synthetic file generator from [WFA2lib](https://github.com/smarco/WFA2-lib).
+* Probides optional **batching**, optional **dynamic thread asignment** and optional **CPU recovery**.
+* The user can configure the size for the different memory structures independently, as well as the number of comput units and threads.
+
+Contents
+--------
+
+* [Features](#features)
+* [Contents](#contents)
+* [Setting up the UPMEM local simulator](#setting-up-the-upmem-local-simulator)
+* [Getting started with BIMSA](#Getting-started-with-BIMSA)
+* [Generating new synthetic inputs](#Generating-new-synthetic-inputs)
+* [Running BIMSA on a UPMEM server](#Running-BIMSA-on-a-UPMEM-server)
+* [Executing BIMSA-Hybrid for real datasets](#Executing-BIMSA-Hybrid-for-real-datasets)
+  * [Reproducing the BIMSA-Hybrid configuration for the paper](#Reproducing-the-BIMSA-Hybrid-configuration-for-the-paper)
+* [Advanced BIMSA configurations](#Advanced-BIMSA-configurations)
+* [All BIMSA script arguments](#All-BIMSA-script-arguments)
+* [For developers](#For-developers)
+
 ## Setting up the UPMEM local simulator
-Python is required if not installed.
+>[!NOTE]
+> Python is required if not installed.
 ```
 sudo apt install python3
 ```
 
-Download the UPMEM SDK from the following source:
+1. Download the UPMEM SDK from the following source: [upmem SDK](https://sdk.upmem.com/)
 
-https://sdk.upmem.com/
-
-1. Untar the binary package, for instance into `$HOME/upmem-sdk` directory.
-2. Source the script `$HOME/upmem-sdk/upmem_env.sh` to set environment variables to appropriate values.
+2. Untar the binary package, for instance into `$HOME/upmem-sdk` directory.
+3. Source the script `$HOME/upmem-sdk/upmem_env.sh` to set environment variables to appropriate values.
 ```
 mkdir $HOME/upmem-sdk
 tar --strip-components=1 -zxvf $HOME/upmem-2023.2.0-Linux-x86_64.tar.gz -C $HOME/upmem-sdk
@@ -46,7 +68,8 @@ Run BIMSA on the new created inputs:
 cd $HOME/BIMSA
 python3 run_bimsa.py -d 2 -t 2 -f $HOME/projects/BIMSA/inputs/n10_l100_e2.seq -s 150
 ```
-Be aware that the file generator creates files with sequence lengths aproximate to the indicated length, so the size `(-s)` on the BIMSA arguments must be at least 5% beyond the dataset sequence size. If the size is inferior to a sequence, this sequence will be discarded.
+> [!IMPORTANT]
+> Be aware that the file generator creates files with sequence lengths aproximate to the indicated length, so the size `(-s)` on the BIMSA arguments must be at least 5% beyond the dataset sequence size. If the size is inferior to a sequence, this sequence will be discarded.
 
 Generated files can be modified in number of pairs, sequence length and error rate.
 ```
@@ -63,9 +86,9 @@ arguments:
   -e ERROR, --error ERROR
                         Error rate (ERROR)
 ```
-## UPMEM simulator limitations
-The UPMEM simulator is only able to run on 8 DPUs max and 24 tasklets.
-The times probided by the simulator are not equivalent to a real hardware execution. The results optained from the alignment are the same as an UPMEM server.
+> [!WARNING]
+> The UPMEM simulator is only able to run on 8 DPUs max and 24 tasklets.
+> The times probided by the simulator are not equivalent to a real hardware execution. The results optained from the alignment are the same as an UPMEM server.
 
 ## Running BIMSA on a UPMEM server
 On a UPMEM server all libraries should be installed, so BIMSA should run straighforward by cloning the repositorie. If there are any SDK problems, contact the UPMEM team for troubleshooting.
@@ -93,17 +116,28 @@ To execute real datasets with heterogeneus alignment sizes optimally. It is reco
 - `-b` Tunes the number of alignments that fit in a batch so the number of batches is determined by the total number of alignments/batch_size. If the batches are used with the CPU recovery, the CPU and DPU kernel executions will overlap for each batch.
 - `--dynamic` Activates the dynamic asignment of alignments between tasklets, which improves performance for heterogeneus datasets.
 
+### Reproducing the BIMSA-Hybrid configuration for the paper
+
+```
+python3 run_bimsa.py -s 21709 -d 2500 -t 12 -f ~/inputs/Nanopore.bowden.1M.seq  -dn -m 600 -b 200000
+```
+```
+python3 run_bimsa.py -s 18318 -d 2500 -t 12 -f ~/inputs/PacBio.CSS.1M.seq -m 50 -dn
+```
 ## Advanced BIMSA configurations
 The user can configure BIMSA's WRAM sctructure sizes by using the arguments `--wf_trans`, `--seq_trans`, `--cigar_trans` indicating the size in a number from 3 to 10 which refers to a power of 2 for the size in MB.
 - `--wf_trans` Controls the wavefront WRAM size.
 - `--seq_trans` Controls the number of characters read from the sequence for the WRAM at a given time.
 - `--cigar_trans` Controls the number of CIGAR characters stored in WRAM before they are written in MRAM.
 
-If BIMSA arises an error comunicating that the WRAM space is surpassed, lowering `--wf_trans`, `--seq_trans`, `--cigar_trans` or the number of tasklets `-t` will trade performance for WRAM space utillization, which will make the file executable.
+> [!IMPORTANT]
+> If BIMSA arises an error comunicating that the WRAM space is surpassed, lowering `--wf_trans`, `--seq_trans`, `--cigar_trans` or the number of tasklets `-t` will trade performance for WRAM space utillization, which will make the file executable.
 
-If BIMSA arises an error comunicating that the MRAM space is surpassed, only decreassing `-t` will trade performance for MRAM utilization. Additionally, if the number of sequences is enough to feed more DPUs, increasing `-d` will lower MRAM utilization. If MRAM utilization is superior to 100% with `-t 1` and using the maximum numbeber of DPUs, it means that the file is not supported for BIMSA execution.
+> [!IMPORTANT]
+> If BIMSA arises an error comunicating that the MRAM space is surpassed, only decreassing `-t` will trade performance for MRAM utilization. Additionally, if the number of sequences is enough to feed more DPUs, increasing `-d` will lower MRAM utilization. If MRAM utilization is superior to 100% with `-t 1` and using the maximum numbeber of DPUs, it means that the file is not supported for BIMSA execution.
 
-The arguments `-p`, `-db`, `-bd`, `-ad` are only for debugging and developing pourposes.
+> [!WARNING]
+> The arguments `-p`, `-db`, `-bd`, `-ad` are only for debugging and > developing pourposes.
 
 ## All BIMSA script arguments
 ```
