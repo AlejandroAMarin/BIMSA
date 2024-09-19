@@ -23,6 +23,8 @@ Contents
 * [Advanced BIMSA configurations](#Advanced-BIMSA-configurations)
 * [All BIMSA script arguments](#All-BIMSA-script-arguments)
 * [For developers](#For-developers)
+  * [UPMEM code file layout](#UPMEM-code-file-layout)
+* [Purchasing a UPMEM server](#Purchasing-a-UPMEM-server)
 
 ## Setting up the UPMEM local simulator
 >[!NOTE]
@@ -33,7 +35,7 @@ sudo apt install python3
 
 1. Download the UPMEM SDK from the following source: [UPMEM SDK](https://sdk.upmem.com/)
 
-2. Untar the binary package, for instance into `$HOME/upmem-sdk` directory.
+2. Unpack the binary package, for instance into `$HOME/upmem-sdk` directory.
 3. Source the script `$HOME/upmem-sdk/upmem_env.sh` to set environment variables to appropriate values.
 ```
 mkdir $HOME/upmem-sdk
@@ -42,7 +44,7 @@ source $HOME/upmem-sdk/upmem_env.sh simulator
 ```
 
 ## Getting started with BIMSA
-Clone this repository and init the submodule:
+Clone this repository and initialize the submodule:
 ```
 git clone git@github.com:AlejandroAMarin/BIMSA.git
 cd BIMSA
@@ -50,7 +52,7 @@ git submodule init
 git submodule update
 ```
 
-Run a unitest:
+Run a unit test:
 ```
 python3 run_bimsa.py -d 2 -t 4 -f $HOME/BIMSA/inputs/wfa.utest.seq -s 20000
 ```
@@ -69,7 +71,7 @@ cd $HOME/BIMSA
 python3 run_bimsa.py -d 2 -t 2 -f $HOME/projects/BIMSA/inputs/n10_l100_e2.seq -s 150
 ```
 > [!IMPORTANT]
-> Be aware that the file generator creates files with sequence lengths aproximate to the indicated length, so the size `(-s)` on the BIMSA arguments must be at least 5% beyond the dataset sequence size. If the size is inferior to a sequence, this sequence will be discarded.
+> Be aware that the file generator creates files with sequence lengths approximate to the indicated length, so the size `(-s)` on the BIMSA arguments must be at least 5% beyond the dataset sequence size. If the size is inferior to a sequence, this sequence will be discarded.
 
 Generated files can be modified in number of pairs, sequence length and error rate.
 ```
@@ -88,10 +90,14 @@ arguments:
 ```
 > [!WARNING]
 > The UPMEM simulator is only able to run on 8 DPUs max and 24 tasklets.
-> The times probided by the simulator are not equivalent to a real hardware execution. The results optained from the alignment are the same as an UPMEM server.
+> The times provided by the simulator are not equivalent to a real hardware execution. The results obtained from the alignment are the same as an UPMEM server.
 
 ## Running BIMSA on a UPMEM server
-On a UPMEM server all libraries should be installed, so BIMSA should run straighforward by cloning the repositorie. If there are any SDK problems, contact the UPMEM team for troubleshooting.
+> [!NOTE]
+> BIMSA was developed and tested in UPMEM UPMEM-v1A chips using SDK 2024.1.0.
+> To check your sdk version run the `dpu-diag` command.
+
+On a UPMEM server all libraries should be installed, so BIMSA should run straightforwardly by cloning the repositorie. If there are any SDK problems, contact the UPMEM team for troubleshooting.
 ```
 git clone git@github.com:AlejandroAMarin/BIMSA.git
 cd BIMSA
@@ -111,10 +117,10 @@ python3 run_bimsa.py -d 2500 -t 12 -f $HOME/projects/BIMSA/inputs/n1000000_l200_
 ```
 
 ## Executing BIMSA-Hybrid for real datasets
-To execute real datasets with heterogeneus alignment sizes optimally. It is recomended to use BIMSA-Hybrid by tunning the parameters `-m` `-b` and using `--dynamic`.
-- `-m` Tunes the nominal distance threshold where the alingments are send to the CPU recovery. Unfortunately, the number of alignments which are recovered in CPU can not be indicated, but tunning must be done to the threshold in order to achieve the desired percentage of alignments recovered.
+To execute real datasets with heterogeneous alignment sizes optimally. It is recommended to use BIMSA-Hybrid by tunning the parameters `-m` `-b` and using `--dynamic`.
+- `-m` Tunes the nominal distance threshold where the alingments are sent to the CPU recovery. Unfortunately, the number of alignments which are recovered in CPU can not be indicated, but tunning must be done to the threshold in order to achieve the desired percentage of alignments recovered.
 - `-b` Tunes the number of alignments that fit in a batch so the number of batches is determined by the total number of alignments/batch_size. If the batches are used with the CPU recovery, the CPU and DPU kernel executions will overlap for each batch.
-- `--dynamic` Activates the dynamic asignment of alignments between tasklets, which improves performance for heterogeneus datasets.
+- `--dynamic` Activates the dynamic assignment of alignments between tasklets, which improves performance for heterogeneus datasets.
 
 ### Reproducing the BIMSA-Hybrid configuration for the paper
 
@@ -125,19 +131,19 @@ python3 run_bimsa.py -s 21709 -d 2500 -t 12 -f ~/inputs/Nanopore.bowden.1M.seq  
 python3 run_bimsa.py -s 18318 -d 2500 -t 12 -f ~/inputs/PacBio.CSS.1M.seq -m 50 -dn
 ```
 ## Advanced BIMSA configurations
-The user can configure BIMSA's WRAM sctructure sizes by using the arguments `--wf_trans`, `--seq_trans`, `--cigar_trans` indicating the size in a number from 3 to 10 which refers to a power of 2 for the size in MB.
+The user can configure BIMSA's WRAM structure sizes by using the arguments `--wf_trans`, `--seq_trans`, `--cigar_trans` indicating the size in a number from 3 to 10 which refers to a power of 2 for the size in MB.
 - `--wf_trans` Controls the wavefront WRAM size.
 - `--seq_trans` Controls the number of characters read from the sequence for the WRAM at a given time.
 - `--cigar_trans` Controls the number of CIGAR characters stored in WRAM before they are written in MRAM.
 
 > [!IMPORTANT]
-> If BIMSA arises an error comunicating that the WRAM space is surpassed, lowering `--wf_trans`, `--seq_trans`, `--cigar_trans` or the number of tasklets `-t` will trade performance for WRAM space utillization, which will make the file executable.
+> If BIMSA raises an error communicating that the WRAM space is surpassed, lowering `--wf_trans`, `--seq_trans`, `--cigar_trans` or the number of tasklets `-t` will trade performance for WRAM space utilization, which will make the file executable.
 
 > [!IMPORTANT]
-> If BIMSA arises an error comunicating that the MRAM space is surpassed, only decreassing `-t` will trade performance for MRAM utilization. Additionally, if the number of sequences is enough to feed more DPUs, increasing `-d` will lower MRAM utilization. If MRAM utilization is superior to 100% with `-t 1` and using the maximum numbeber of DPUs, it means that the file is not supported for BIMSA execution.
+> If BIMSA raises an error communicating that the MRAM space is surpassed, only decreasing `-t` will trade performance for MRAM utilization. Additionally, if the number of sequences is enough to feed more DPUs, increasing `-d` will lower MRAM utilization. If MRAM utilization is superior to 100% with `-t 1` and using the maximum numbeber of DPUs, it means that the file is not supported for BIMSA execution.
 
 > [!WARNING]
-> The arguments `-p`, `-db`, `-bd`, `-ad` are only for debugging and developing pourposes. The heuristics code is not maintained.
+> The arguments `-p`, `-db`, `-bd`, `-ad` are only for debugging and developing purposes. The heuristics code is not maintained.
 
 ## All BIMSA script arguments
 ```
@@ -175,13 +181,13 @@ arguments:
 ```
 
 ## For developers
-This section is aimed to users who are curious about the structure and basic functionallity of a UPMEM application.
+This section is aimed at users who are curious about the structure and basic functionality of a UPMEM application.
 
-UPMEM applications are composed mainly by a host file and a DPU kernel file. Both files are written in regular C using UPMEM library directives.
+UPMEM applications are composed mainly of a host file and a DPU kernel file. Both files are written in regular C using UPMEM library directives.
 
-The DPU kernel file is compiled using the UPMEM SDK directive.
+The DPU kernel file is compiled using the UPMEM SDK command.
 
-The host file is compiled using the regular gcc, but using the includes of UPMEM libraries inside the code.
+The host file is compiled using the regular GCC, but using the UPMEM libraries includes inside the code.
 
 Once both files are compiled, the host file will run and manage the DPU kernel code by using the UPMEM library directives.
 
@@ -206,3 +212,11 @@ BIMSA/
 │  │  └─ timer.h
 │  └─ Makefile
 ```
+
+## Purchasing a UPMEM server
+There are three options for accessing UPMEM infrastructure currently:
+1. Renting cloud access to UPMEM’s servers. Access to UPMEM cloud costs $25/hr ($15/hr for academics). However, a large part of the developments can be done offline using the UPMEM functional simulator, which is integrated into UPMEM’s SDK and can be downloaded for free. Unfortunately, the simulator can only simulate up to 8 compute units and does not provide the time measurements that a real UPMEM system provides.
+2. Buying UPMEM DIMM modules. The price for one UPMEM DIMM is $450 - and a server can be populated with up to 20 UPMEM modules. For now, UPMEM’s DIMMs are only compatible with the Intel® Server Board S2600WF Product Family. This is the most economical on premise option.
+3. Buying a pre-configured UPMEM server. This option avoids potential integration and installation difficulties, but is less affordable. The cost is approximately $20k for a server populated with 20 PIM modules.
+
+For more information contact [UPMEM](https://www.upmem.com/)
