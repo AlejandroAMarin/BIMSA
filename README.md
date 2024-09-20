@@ -54,21 +54,21 @@ git submodule update
 
 Run a unit test:
 ```
-python3 run_bimsa.py -d 2 -t 4 -f $HOME/BIMSA/inputs/wfa.utest.seq -s 20000
+python3 run_bimsa.py -d 2 -t 4 -f $PWD/BIMSA/inputs/wfa.utest.seq -s 20000
 ```
 
 ## Generating new synthetic inputs
 To generate new synthetic inputs, first compile the tool, second run the script indicating your file sizes and error.
 ```
-cd $HOME/BIMSA/tools/generate_dataset/
+cd tools/generate_dataset/
 make
-cd $HOME/BIMSA/scripts/
+cd ../../scripts/
 python3 gen_input.py -n 10 -l 100 -e 0.02
 ```
 Run BIMSA on the new created inputs:
 ```
-cd $HOME/BIMSA
-python3 run_bimsa.py -d 2 -t 2 -f $HOME/projects/BIMSA/inputs/n10_l100_e2.seq -s 150
+cd ../
+python3 run_bimsa.py -d 2 -t 2 -f $PWD/inputs/n10_l100_e2.seq -s 150
 ```
 > [!IMPORTANT]
 > Be aware that the file generator creates files with sequence lengths approximate to the indicated length, so the size `(-s)` on the BIMSA arguments must be at least 5% beyond the dataset sequence size. If the size is inferior to a sequence, this sequence will be discarded.
@@ -106,14 +106,16 @@ git submodule update
 ```
 Create a large enough file to feed all the DPUs
 ```
-cd $HOME/BIMSA/scripts/
+cd tools/generate_dataset/
+make
+cd ../../scripts/
 python3 gen_input.py -n 1000000 -l 200 -e 0.10
 ```
 
 Run the file indicating more DPUs and more tasklets using -d and -t respectively.
 ```
-cd $HOME/BIMSA
-python3 run_bimsa.py -d 2500 -t 12 -f $HOME/projects/BIMSA/inputs/n1000000_l200_e10.seq -s 250
+cd ../
+python3 run_bimsa.py -d 2500 -t 12 -f $PWD/inputs/n1000000_l200_e10.seq -s 250
 ```
 
 ## Executing BIMSA-Hybrid for real datasets
@@ -123,12 +125,14 @@ To execute real datasets with heterogeneous alignment sizes optimally. It is rec
 - `--dynamic` Activates the dynamic assignment of alignments between tasklets, which improves performance for heterogeneus datasets.
 
 ### Reproducing the BIMSA-Hybrid configuration for the paper
+>[!WARNING]
+> The Illumina, PacBio and Nanopore files are not included in the repositorie.
 
 ```
-python3 run_bimsa.py -s 21709 -d 2500 -t 12 -f ~/inputs/Nanopore.bowden.1M.seq  -dn -m 600 -b 200000
+python3 run_bimsa.py -s 21709 -d 2500 -t 12 -f $PWD/inputs/Nanopore.bowden.1M.seq  -dn -m 600 -b 200000
 ```
 ```
-python3 run_bimsa.py -s 18318 -d 2500 -t 12 -f ~/inputs/PacBio.CSS.1M.seq -m 50 -dn
+python3 run_bimsa.py -s 18318 -d 2500 -t 12 -f $PWD/inputs/PacBio.CSS.1M.seq -m 50 -dn
 ```
 ## Advanced BIMSA configurations
 The user can configure BIMSA's WRAM structure sizes by using the arguments `--wf_trans`, `--seq_trans`, `--cigar_trans` indicating the size in a number from 3 to 10 which refers to a power of 2 for the size in MB.
