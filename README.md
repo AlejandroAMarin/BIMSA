@@ -6,7 +6,7 @@ Implementation of a distance-based Bidirectional Wavefront Algorithm tailored fo
 * Calculates **edit distance (Levenshtein distance)** and the **optimal alignment path (CIGAR)**.
 * It scales to **long and noisy sequences** as long as the allocated memory does not surpass the **MRAM limit** (64MB).
 * Includes a synthetic file generator from [WFA2lib](https://github.com/smarco/WFA2-lib).
-* Probides optional **batching**, optional **dynamic thread asignment** and optional **CPU recovery**.
+* Provides optional **batching**, optional **dynamic thread asignment** and optional **CPU recovery**.
 * The user can configure the size for the different memory structures independently, as well as the number of comput units and threads.
 
 Contents
@@ -24,7 +24,7 @@ Contents
 * [All BIMSA script arguments](#All-BIMSA-script-arguments)
 * [For developers](#For-developers)
   * [UPMEM code file layout](#UPMEM-code-file-layout)
-* [Purchasing a UPMEM server](#Purchasing-a-UPMEM-server)
+* [Access to a UPMEM server](#Access-to-a-UPMEM-server)
 
 ## Setting up the UPMEM local simulator
 >[!NOTE]
@@ -54,7 +54,7 @@ git submodule update
 
 Run a unit test:
 ```
-python3 run_bimsa.py -d 2 -t 4 -f $PWD/BIMSA/inputs/wfa.utest.seq -s 20000
+python3 run_bimsa.py -d 2 -t 4 -f $PWD/inputs/wfa.utest.seq -s 20000
 ```
 
 ## Generating new synthetic inputs
@@ -97,7 +97,7 @@ arguments:
 > BIMSA was developed and tested in UPMEM UPMEM-v1A chips using SDK 2024.1.0.
 > To check your sdk version run the `dpu-diag` command.
 
-On a UPMEM server all libraries should be installed, so BIMSA should run straightforwardly by cloning the repositorie. If there are any SDK problems, contact the UPMEM team for troubleshooting.
+On a UPMEM server all libraries should be installed, so BIMSA should run straightforwardly by cloning the repository. If there are any SDK problems, contact the UPMEM team for troubleshooting.
 ```
 git clone git@github.com:AlejandroAMarin/BIMSA.git
 cd BIMSA
@@ -126,7 +126,7 @@ To execute real datasets with heterogeneous alignment sizes optimally. It is rec
 
 ### Reproducing the BIMSA-Hybrid configuration for the paper
 >[!WARNING]
-> The Illumina, PacBio and Nanopore files are not included in the repositorie.
+> The Illumina, PacBio and Nanopore files are not included in the repositorie due to file size. The datasets and similar ones can be found at [Genome in a bottle](https://github.com/genome-in-a-bottle/giab_data_indexes)
 
 ```
 python3 run_bimsa.py -s 21709 -d 2500 -t 12 -f $PWD/inputs/Nanopore.bowden.1M.seq  -dn -m 600 -b 200000
@@ -217,10 +217,10 @@ BIMSA/
 │  └─ Makefile
 ```
 
-## Purchasing a UPMEM server
+## Access to a UPMEM server
 There are three options for accessing UPMEM infrastructure currently:
-1. Renting cloud access to UPMEM’s servers. Access to UPMEM cloud costs $25/hr ($15/hr for academics). However, a large part of the developments can be done offline using the UPMEM functional simulator, which is integrated into UPMEM’s SDK and can be downloaded for free. Unfortunately, the simulator can only simulate up to 8 compute units and does not provide the time measurements that a real UPMEM system provides.
-2. Buying UPMEM DIMM modules. The price for one UPMEM DIMM is $450 - and a server can be populated with up to 20 UPMEM modules. For now, UPMEM’s DIMMs are only compatible with the Intel® Server Board S2600WF Product Family. This is the most economical on premise option.
-3. Buying a pre-configured UPMEM server. This option avoids potential integration and installation difficulties, but is less affordable. The cost is approximately $20k for a server populated with 20 PIM modules.
+1. Renting cloud access to UPMEM’s servers.
+2. Buying UPMEM DIMM modules. For now, UPMEM’s DIMMs are only compatible with the Intel® Server Board S2600WF Product Family.
+3. Buying a pre-configured UPMEM server.
 
 For more information contact [UPMEM](https://www.upmem.com/)
