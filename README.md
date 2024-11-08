@@ -25,6 +25,7 @@ Contents
 * [For developers](#For-developers)
   * [UPMEM code file layout](#UPMEM-code-file-layout)
 * [Access to a UPMEM server](#Access-to-a-UPMEM-server)
+* [Citation](#Citation)
 
 ## Setting up the UPMEM local simulator
 >[!NOTE]
@@ -224,3 +225,7 @@ There are three options for accessing UPMEM infrastructure currently:
 3. Buying a pre-configured UPMEM server.
 
 For more information contact [UPMEM](https://www.upmem.com/)
+
+## Citation
+Alejandro Alonso-Marín, Ivan Fernandez, Quim Aguado-Puig,
+Juan Gómez-Luna, Santiago Marco-Sola, Onur Mutlu, Miquel Moreto. BIMSA: Accelerating Long Sequence Alignment Using Processing-In-Memory. Bioinformatics (2024). DOI [Bioinformatics, btae631](https://doi.org/10.1093/bioinformatics/btae631)
